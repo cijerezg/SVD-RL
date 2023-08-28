@@ -133,7 +133,7 @@ class VaLS(hyper_params):
         self.experience_buffer.add(obs, next_obs, z, next_z, rew, done)
 
         if done:
-            if self.total_episode_counter > 2 and self.modified_buffer:
+            if self.total_episode_counter > 2:
                 self.experience_buffer.update_tracking_buffers(self.reward_per_episode)
 
             wandb.log({'Reward per episode': self.reward_per_episode,

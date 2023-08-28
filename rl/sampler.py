@@ -17,12 +17,14 @@ import pdb
 WIDTH = 4 * 640
 HEIGHT = 4 * 480
 
+
 class Sampler(hyper_params):
-    def __init__(self, skill_policy, decoder, args):
+    def __init__(self, skill_policy, decoder, eval_decoder, args):
         super().__init__(args)
 
         self.skill_policy = skill_policy
         self.decoder = decoder
+        self.eval_decoder = eval_decoder
         MAX_EPISODE_STEPS = 257 if self.env_key == 'adroit' else 256
 
         self.env = gym.make(self.env_id)
@@ -57,20 +59,28 @@ class Sampler(hyper_params):
     def skill_step(self, params, obs, frames=None):
         obs_t = torch.from_numpy(obs).to(self.device).to(torch.float32)
         obs_t = obs_t.reshape(1, -1)
+        obs_trj, rew_trj, done_trj = [], [], []
 
         with torch.no_grad():
             z_sample, _, _, _ = functional_call(self.skill_policy,
                                                 params['SkillPolicy'],
                                                 obs_t)
-                
-            actions = self.decoder(z_sample, params)
-            actions = actions.reshape(-1, actions.shape[-1])
 
-        actions = actions.cpu().detach().numpy()
-        clipped_actions = np.clip(actions, -1, 1)
-            
-        obs_trj, rew_trj, done_trj, frames = self.skill_execution(clipped_actions,
-                                                                  frames=frames)
+            self.decoder.reset_hidden_state(z_sample)
+            self.decoder.func_embed_z(z_sample)
+
+            for i in range(self.length):
+                action = self.eval_decoder(obs_t, params)
+                action = action.cpu().detach().numpy()
+                action = action.squeeze()
+                obs, rew, _, done, info = self.env.step(action)
+                obs_t = torch.from_numpy(obs).to(self.device).to(torch.float32)
+                
+                # Collect trajectories
+                obs_trj.append(obs)
+                rew_trj.append(rew)
+                done_trj.append(done)
+
 
         if frames is not None:
             done = True if sum(done_trj) > 0 else False
@@ -98,13 +108,13 @@ class Sampler(hyper_params):
 
     def skill_iteration(self, params, done=False, obs=None):
         if done or obs is None:
-            obs = self.env.reset()
+            obs, _ = self.env.reset()
 
         return obs, self.skill_step(params, obs)
 
     def skill_iteration_with_frames(self, params, done=False, obs=None, frames=None):
         if done or obs is None:
-            obs = self.env.reset()
+            obs, _ = self.env.reset()
 
         frames = self.skill_step(params, obs, frames)
 
@@ -112,7 +122,9 @@ class Sampler(hyper_params):
     
        
 class ReplayBuffer:
-    def __init__(self, size, env, lat_dim, reset_ratio):
+    def __init__(self, size, env, lat_dim, reset_ratio, length):
+
+        self.length = length
         self.obs_buf = np.zeros((size, *env.observation_space.shape), dtype=np.float32)
         self.next_obs_buf = np.zeros((size, *env.observation_space.shape), dtype=np.float32)
         self.z_buf = np.zeros((size, lat_dim), dtype=np.float32)
@@ -150,7 +162,7 @@ class ReplayBuffer:
         
         self.idx_tracker[idxs] += 1
 
-        idxs_off = np.random.randint(0, 120000, size=int(s_ratio * 256))
+        idxs_off = np.random.randint(0, self.size, size=int(s_ratio * 256))
 
         obs = np.concatenate((self.obs_buf[idxs], self.offline_obs_buf[idxs_off]), axis=0)
         z = np.concatenate((self.z_buf[idxs], self.offline_z_buf[idxs_off]), axis=0)
@@ -211,32 +223,46 @@ class ReplayBuffer:
     def log_offline_dataset(self, path, params, eval_encoder, device):
         dataset = torch.load(path)
 
-        size = 125000
+        total_size = dataset['actions'].shape[0]
+        self.offline_size = int(total_size / self.length)
+        iters = 5000
 
-        self.offline_next_obs_buf = np.zeros((size, *self.env.observation_space.shape), dtype=np.float32)
-        self.offline_z_buf = np.zeros((size, self.lat_dim), dtype=np.float32)
-        self.offline_next_z_buf = np.zeros((size, self.lat_dim), dtype=np.float32)
+        self.offline_next_obs_buf = np.zeros((self.offline_size, *self.env.observation_space.shape),
+                                             dtype=np.float32)
+        self.offline_z_buf = np.zeros((self.offline_size, self.lat_dim), dtype=np.float32)
+        self.offline_next_z_buf = np.zeros((self.offline_size, self.lat_dim), dtype=np.float32)
 
         keys = ['observations', 'actions', 'rewards', 'timeouts']
         dataset = {key: dataset[key] for key in keys}
 
         actions = torch.from_numpy(dataset['actions']).to(device)
 
-        for i in range(5000):
+        batch_size = int(total_size / iters)
+        chunk = int(batch_size / self.length)
+
+        for i in range(iters):
             with torch.no_grad():
-                z, pdf, mu, std = eval_encoder(actions[200 * i: 200 * (i + 1), :], params)
+                z, pdf, mu, std = eval_encoder(actions[batch_size * i: batch_size * (i + 1), :], params)
             mu = mu.cpu().numpy()
-            self.offline_z_buf[25 * i: 25 * (i + 1), :] = mu
+            self.offline_z_buf[chunk * i: chunk * (i + 1), :] = mu
+            
+        self.offline_obs_buf = dataset['observations'][0::self.length]
+        self.offline_rew_buf = dataset['rewards'][0::self.length]
+        self.offline_done_buf = dataset['timeouts'][self.length-1::self.length]
 
-        self.offline_obs_buf = dataset['observations'][0::8]
-        self.offline_rew_buf = dataset['rewards'][0::8]
-        self.offline_done_buf = dataset['timeouts'][7::8]
+        timeouts = dataset['timeouts']
+        timeouts[-1] = True
 
-        self.offline_cum_reward_buf = dataset['rewards'][dataset['timeouts']]
-        self.offline_cum_reward_buf = np.repeat(self.offline_cum_reward_buf, 25)
+        aux_val = dataset['rewards'][dataset['timeouts']]
 
-        self.offline_next_obs_buf[0:size - 1, :] = self.offline_obs_buf[1:, :]
-        self.offline_next_z_buf[0:size - 1, :] = self.offline_z_buf[1:, :]
+        done_idx = np.arange(dataset['timeouts'].shape[0])
+        done_idx = done_idx[dataset['timeouts']]
+        done_idx = np.insert(done_idx, 0, 0)
+        self.offline_cum_reward_buf = np.repeat(aux_val, np.diff(done_idx))
+        self.offline_cum_reward_buf = self.offline_cum_reward_buf[0::self.length]
+
+        self.offline_next_obs_buf[0:self.offline_size - 1, :] = self.offline_obs_buf[1:, :]
+        self.offline_next_z_buf[0:self.offline_size - 1, :] = self.offline_z_buf[1:, :]
 
         self.offline_obs_buf = self.offline_obs_buf[~self.offline_done_buf, :]
         self.offline_z_buf = self.offline_z_buf[~self.offline_done_buf, :]
@@ -244,6 +270,7 @@ class ReplayBuffer:
         self.offline_next_z_buf = self.offline_next_z_buf[~self.offline_done_buf, :]
         self.offline_rew_buf = self.offline_rew_buf[~self.offline_done_buf].reshape(-1, 1)
         self.offline_cum_reward_buf = self.offline_cum_reward_buf[~self.offline_done_buf].reshape(-1, 1)
-        self.offline_done_buf = self.offline_done_buf[~self.offline_done_buf].reshape(-1, 1)  
-
+        self.offline_done_buf = self.offline_done_buf[~self.offline_done_buf].reshape(-1, 1)
+        pdb.set_trace()
+        self.offline_size = self.offline_obs_buf.shape[0]
         
