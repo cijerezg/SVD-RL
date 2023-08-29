@@ -67,8 +67,8 @@ config = {
     'train_VAE_models': False,
     'train_priors': False,
     'train_rl': True,
-    'load_VAE_models': False,
-    'load_prior_models': False,
+    'load_VAE_models': True,
+    'load_prior_models': True,
     'load_rl_models': False,
     'use_SAC': False,
     'render_results': False
@@ -119,7 +119,7 @@ def main(config=None):
         names = [*hives.names, 'SkillPolicy', 'Critic1', 'Target_critic1',
                  'Critic2', 'Target_critic2']
     
-        params_path = 'params_rl.pt'
+        params_path = 'Prior/params_29-08-2023-10_39_48_offline.pt'
         
         pretrained_params = load_pretrained_models(config, PARENT_FOLDER, params_path)
         pretrained_params.extend([None] * (len(names) - len(pretrained_params)))

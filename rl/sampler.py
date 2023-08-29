@@ -277,7 +277,7 @@ class ReplayBuffer(hyper_params):
         
     def d4rl_reward_map(self, reward):
         if self.env_key == 'adroit':
-            return np.where(reward < 9, -.1, 10.0)
+            return np.where(reward < 9, -.1, 10.0).astype(np.float32)
 
         else:
             return reward
