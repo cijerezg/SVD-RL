@@ -162,7 +162,7 @@ class ReplayBuffer(hyper_params):
         
         self.idx_tracker[idxs] += 1
 
-        idxs_off = np.random.randint(0, self.size, size=int(s_ratio * 256))
+        idxs_off = np.random.randint(0, self.offline_size, size=int(s_ratio * 256))
 
         obs = np.concatenate((self.obs_buf[idxs], self.offline_obs_buf[idxs_off]), axis=0)
         z = np.concatenate((self.z_buf[idxs], self.offline_z_buf[idxs_off]), axis=0)
@@ -277,7 +277,7 @@ class ReplayBuffer(hyper_params):
         
     def d4rl_reward_map(self, reward):
         if self.env_key == 'adroit':
-            return np.where(reward < 9, -.1, 10.0).astype(np.float32)
+            return np.where(reward < 5, -.1, 10.0).astype(np.float32)
 
         else:
             return reward

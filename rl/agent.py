@@ -185,7 +185,7 @@ class VaLS(hyper_params):
         dones = torch.from_numpy(batch.dones).to(self.device)
         cum_reward = torch.from_numpy(batch.cum_reward).to(self.device)
         idxs = torch.from_numpy(batch.idxs).to(self.device)
-
+        
         if log_data:
             singular_vals = self.compute_singular_vals(params)
 
