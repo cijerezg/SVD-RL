@@ -121,10 +121,10 @@ class Sampler(hyper_params):
         return frames
     
        
-class ReplayBuffer:
-    def __init__(self, size, env, lat_dim, reset_ratio, length):
+class ReplayBuffer(hyper_params):
+    def __init__(self, size, env, lat_dim, reset_ratio, args):
+        super().__init__(args)
 
-        self.length = length
         self.obs_buf = np.zeros((size, *env.observation_space.shape), dtype=np.float32)
         self.next_obs_buf = np.zeros((size, *env.observation_space.shape), dtype=np.float32)
         self.z_buf = np.zeros((size, lat_dim), dtype=np.float32)
@@ -223,6 +223,8 @@ class ReplayBuffer:
     def log_offline_dataset(self, path, params, eval_encoder, device):
         dataset = torch.load(path)
 
+        dataset['rewards'] = self.d4rl_reward_map(dataset['rewards'])
+        
         total_size = dataset['actions'].shape[0]
         self.offline_size = int(total_size / self.length)
         iters = 5000
@@ -273,3 +275,9 @@ class ReplayBuffer:
         self.offline_done_buf = self.offline_done_buf[~self.offline_done_buf].reshape(-1, 1)
         self.offline_size = self.offline_obs_buf.shape[0]
         
+    def d4rl_reward_map(self, reward):
+        if self.env_key == 'adroit':
+            return np.where(reward < 9, -.1, 10.0)
+
+        else:
+            return reward

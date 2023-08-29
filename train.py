@@ -14,6 +14,11 @@ import numpy as np
 import copy
 import pickle
 
+
+
+# When using kitchen, remember in D4RL the tasks are open microwave,
+# move kettle, flip light switch, and open (slide) cabinet.
+
 torch.set_printoptions(sci_mode=False)
 np.set_printoptions(precision=5)
 
@@ -59,9 +64,9 @@ config = {
     'singular_val_k': 1,
 
     # Run params
-    'train_VAE_models': True,
+    'train_VAE_models': False,
     'train_priors': False,
-    'train_rl': False,
+    'train_rl': True,
     'load_VAE_models': False,
     'load_prior_models': False,
     'load_rl_models': False,
@@ -96,7 +101,7 @@ def main(config=None):
 
         experience_buffer = ReplayBuffer(hives.buffer_size, sampler.env,
                                          hives.z_skill_dim, config.reset_frequency,
-                                         hives.length)
+                                         config)
 
         vals = VaLS(sampler,
                     experience_buffer,

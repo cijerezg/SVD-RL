@@ -24,7 +24,12 @@ class hyper_params:
         
         self.device = torch.device(args.device)
         self.action_dim, self.state_dim = self.env_dims(args.env_id)
-        self.env_key = 'adroit' if 'Adroit' in self.env_id else 'next'
+        if 'Adroit' in self.env_id:
+            self.env_key = 'adroit'
+        elif 'Kitchen' in self.env_id:
+            self.env_key = 'kitchen'
+        elif 'Ant' in self.env_id:
+            self.env_key = 'ant'
         # Assign env_key for all other environments.
 
     def env_dims(self, env_id):
