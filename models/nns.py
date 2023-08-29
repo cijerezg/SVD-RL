@@ -65,18 +65,21 @@ class StateConditionedDecoder(nn.Module):
         # x: [batch_size, input_size (z_dim)]
         obs = F.relu(self.embed_obs(obs))
 
-        x = obs + self.embedded_z
-        x = x.reshape(-1, 1, x.shape[-1])
+        x = obs + self.embedded_z[:, self.counter, :]
 
-        x, (self.hn, self.cn) = self.lstm(x, (self.hn, self.cn))
-
-        out = F.relu(self.hidden(x[:, -1, :]))
+        out = F.relu(self.hidden(x))
         out = self.out(out)
-        
+        self.counter += 1
+    
         return out
 
     def func_embed_z(self, z):
-        self.embedded_z = F.relu(self.embed_z(z))
+        x = F.relu(self.embed_z(z))
+        x = x.reshape(-1, 1, x.shape[-1])
+        x = x.repeat(1, self.seq_length, 1)
+        self.embedded_z, _ = self.lstm(x)
+        self.counter = 0
+
 
     def reset_hidden_state(self, x):
         self.hn = torch.zeros(1, x.shape[0], self.hidden_dim).to(x.device)

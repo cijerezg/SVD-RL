@@ -271,6 +271,5 @@ class ReplayBuffer:
         self.offline_rew_buf = self.offline_rew_buf[~self.offline_done_buf].reshape(-1, 1)
         self.offline_cum_reward_buf = self.offline_cum_reward_buf[~self.offline_done_buf].reshape(-1, 1)
         self.offline_done_buf = self.offline_done_buf[~self.offline_done_buf].reshape(-1, 1)
-        pdb.set_trace()
         self.offline_size = self.offline_obs_buf.shape[0]
         

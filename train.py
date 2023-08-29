@@ -59,9 +59,9 @@ config = {
     'singular_val_k': 1,
 
     # Run params
-    'train_VAE_models': False,
+    'train_VAE_models': True,
     'train_priors': False,
-    'train_rl': True,
+    'train_rl': False,
     'load_VAE_models': False,
     'load_prior_models': False,
     'load_rl_models': False,
