@@ -65,7 +65,7 @@ class HIVES(hyper_params):
         for i, idx in enumerate(self.loader):
             action = torch.from_numpy(self.dataset['actions'][idx]).to(self.device)
             obs = torch.from_numpy(self.dataset['observations'][idx]).to(self.device)
-            recon_loss, kl_loss = self.vae_loss(action, obs, params)
+            recon_loss, kl_loss = self.vae_loss(action, obs, params, i)
             loss = recon_loss + beta * kl_loss
             losses = [loss]
             params_names = ['VAE_skills']
@@ -76,7 +76,7 @@ class HIVES(hyper_params):
         
         return params
 
-    def vae_loss(self, action, obs, params):
+    def vae_loss(self, action, obs, params, i):
         """VAE loss."""
         z_seq, pdf, mu, std = self.evaluate_encoder(action, params)
 
@@ -84,8 +84,8 @@ class HIVES(hyper_params):
         self.models['Decoder'].func_embed_z(z_seq)
         
         rec = []
-        for i in range(self.length):
-            aux_rec = self.evaluate_decoder(obs[:, i, :], params)
+        for j in range(self.length):
+            aux_rec = self.evaluate_decoder(obs[:, j, :], params)
             rec.append(aux_rec)
 
         rec = torch.stack(rec)
@@ -100,7 +100,8 @@ class HIVES(hyper_params):
                        wandb.Histogram(std.detach().cpu())})
             wandb.log({'VAE/[encoder] Mu':
                        wandb.Histogram(mu.detach().cpu())})
-            wandb.log({'VAE/[decoder]reconstruction_std': rec.std(0).mean().detach().cpu()})
+            wandb.log({'VAE/[decoder]reconstruction_std': rec.std(0).mean().detach().cpu(),
+                       'VAE/MSE': error.mean().detach().cpu()})
             if rec_loss < 5:
                 wandb.log({'VAE/MSE Distribution':
                            wandb.Histogram(error.detach().cpu())})

@@ -77,7 +77,7 @@ def main(config=None):
     """Train all modules."""
     with wandb.init(project='SVD-Relocate-Offline', config=config,
                     notes='VAE training',
-                    name='VAE'):
+                    name='VAE test'):
 
         config = wandb.config
 
