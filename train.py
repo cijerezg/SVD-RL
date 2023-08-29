@@ -121,8 +121,9 @@ def main(config=None):
         
         params = params_extraction(models, names, pretrained_params)
 
-        vals.experience_buffer.log_offline_dataset(f'datasets/{ENV_NAME}.pt',
-                                                   params, hives.evaluate_encoder, hives.device)
+        if config.train_rl:
+            vals.experience_buffer.log_offline_dataset(f'datasets/{ENV_NAME}.pt',
+                                                       params, hives.evaluate_encoder, hives.device)
         
         test_freq = config.epochs // 4
         test_freq = test_freq if test_freq > 0 else 1
