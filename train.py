@@ -57,12 +57,17 @@ config = {
     'delta_length': 32,
     'z_state_dim': 8,
     'gradient_steps': 16,
-    'max_iterations': int(200000 + 1),
-    'buffer_size': int(200000 + 1),
+    'max_iterations': int(100000 + 1),
+    'buffer_size': int(100000 + 1),
     'test_freq': 100000,
-    'reset_frequency': 25000,
+    'reset_frequency': 10000,
     'singular_val_k': 1,
 
+    # Algo selection params
+    'SVD': True,
+    'Replayratio': False,
+    'Underparameter': False,
+    
     # Run params
     'train_VAE_models': False,
     'train_priors': False,

@@ -58,7 +58,7 @@ class VaLS(hyper_params):
         self.total_episode_counter = 0
         self.reward_logger = [0]
         self.log_data = 0
-        self.log_data_freq = 1000
+        self.log_data_freq = 200
         self.email = True
         
     def training(self, params, optimizers, path, name):
@@ -95,21 +95,24 @@ class VaLS(hyper_params):
             if self.iterations == int(self.reset_frequency * 3 / 4):
                 ref_params = copy.deepcopy(params)
 
-            if self.iterations % self.reset_frequency == 0:
-                self.reset_frequency = 2 * self.reset_frequency
-                self.gradient_steps = math.ceil(self.gradient_steps / 2)
-                self.interval_iteration = 0
-                keys = ['SkillPolicy', 'Critic1', 'Critic2']
-                ref_params = copy.deepcopy(params)
-                #params, optimizers = reset_params(params, keys, optimizers, self.actor_lr)
-                params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.actor_lr)
-                self.singular_val_k = 2 * self.singular_val_k
-                self.log_alpha_skill = torch.tensor(INIT_LOG_ALPHA, dtype=torch.float32,
-                                                    requires_grad=True,
-                                                    device=self.device)
-                self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=self.actor_lr)
 
-                self.experience_buffer.idx_tracker[:] = 0
+            if self.SVD or self.Replayratio:
+                if self.iterations % self.reset_frequency == 0:
+                    if self.SVD:
+                        self.reset_frequency = 2 * self.reset_frequency
+                    self.gradient_steps = math.ceil(self.gradient_steps / 2)
+                    self.interval_iteration = 0
+                    keys = ['SkillPolicy', 'Critic1', 'Critic2']
+                    ref_params = copy.deepcopy(params)
+                    #params, optimizers = reset_params(params, keys, optimizers, self.actor_lr)
+                    params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.actor_lr)
+                    self.singular_val_k = 2 * self.singular_val_k
+                    self.log_alpha_skill = torch.tensor(INIT_LOG_ALPHA, dtype=torch.float32,
+                                                        requires_grad=True,
+                                                        device=self.device)
+                    self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=self.actor_lr)
+                    
+                    self.experience_buffer.idx_tracker[:] = 0
                 
         return params
 

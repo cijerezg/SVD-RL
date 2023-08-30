@@ -25,10 +25,11 @@ class Sampler(hyper_params):
         self.skill_policy = skill_policy
         self.decoder = decoder
         self.eval_decoder = eval_decoder
-        MAX_EPISODE_STEPS = 257 if self.env_key == 'adroit' else 256
+        MAX_EPISODE_STEPS = 200
 
-        self.env = gym.make(self.env_id)
-        self.env._max_episode_steps = MAX_EPISODE_STEPS
+        self.env = gym.make(self.env_id, max_episode_steps=MAX_EPISODE_STEPS,
+                            render_mode='human')
+
         
     def skill_execution(self, actions, frames=None):
         obs_trj, rew_trj, done_trj = [], [], []
