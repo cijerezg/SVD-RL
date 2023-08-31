@@ -244,38 +244,39 @@ class VaLS(hyper_params):
             wandb.log({'Logged idx': wandb.Histogram(np_histogram=hist)})
                                                                  
         ####
-        trials = 64
-        
-        expanded_z = next_z.reshape(1, next_z.shape[0], next_z.shape[1]).repeat(trials, 1, 1)
-        expanded_z = expanded_z + torch.randn(expanded_z.shape).to(self.device) / 2.0
+        if self.SVD:
+            trials = 64
+            expanded_z = next_z.reshape(1, next_z.shape[0], next_z.shape[1]).repeat(trials, 1, 1)
+            expanded_z = expanded_z + torch.randn(expanded_z.shape).to(self.device) / 2.0
+            expanded_obs = next_obs.reshape(1, next_obs.shape[0], next_obs.shape[1]).repeat(trials, 1, 1)
+            target_critic_arg_aux = torch.cat([expanded_obs, expanded_z], dim=2)
+            target_critic_arg_aux = torch.swapaxes(target_critic_arg_aux, 0, 1)
+            target_critic_arg_aux = target_critic_arg_aux.reshape(-1, target_critic_arg_aux.shape[-1])
 
-        expanded_obs = next_obs.reshape(1, next_obs.shape[0], next_obs.shape[1]).repeat(trials, 1, 1)
-        
+
         target_critic_arg = torch.cat([next_obs, next_z], dim=1)
-        target_critic_arg_aux = torch.cat([expanded_obs, expanded_z], dim=2)
-        target_critic_arg_aux = torch.swapaxes(target_critic_arg_aux, 0, 1)
-        target_critic_arg_aux = target_critic_arg_aux.reshape(-1, target_critic_arg_aux.shape[-1])
-
         critic_arg = torch.cat([obs, z], dim=1)
         
         with torch.no_grad():                                
             z_prior = self.eval_skill_prior(obs, params)
+
+            if self.SVD:
+                q_target1, q_target2 = self.eval_critic(target_critic_arg_aux, params,
+                                                        target_critic=True)
+
+                q_target1, q_target2 = q_target1.reshape(-1, trials, 1), q_target2.reshape(-1, trials, 1)
+                q_target1, q_target2 = q_target1.mean(1), q_target2.mean(1)
+                if log_data:
+                    stds = q_target1.std(1)
+                    means = q_target1.mean(1)                    
+                    heatmap_Q_explore = self.log_histogram_2d(means, stds, 'Means', 'STDs')
+                    wandb.log({'Critic/Q variation': heatmap_Q_explore})
+
+
+            else:
+                q_target1, q_target2 = self.eval_critic(target_critic_arg, params,
+                                                        target_critc=True)
             
-            q_target1, q_target2 = self.eval_critic(target_critic_arg_aux, params,
-                                                    target_critic=True)
-
-            q_target1, q_target2 = q_target1.reshape(-1, trials, 1), q_target2.reshape(-1, trials, 1)
-
-            if log_data:
-                stds = q_target1.std(1)
-                means = q_target1.mean(1)
-
-                heatmap_Q_explore = self.log_histogram_2d(means, stds, 'Means', 'STDs')
-                
-                wandb.log({'Critic/Q variation': heatmap_Q_explore})
-            
-            q_target1, q_target2 = q_target1.mean(1), q_target2.mean(1)
-
         q_target = torch.cat((q_target1, q_target2), dim=1)
         q_target, _ = torch.min(q_target, dim=1)
 
@@ -326,11 +327,13 @@ class VaLS(hyper_params):
         critic2_loss = F.mse_loss(q2.squeeze(), q_target.squeeze(),
                                   reduction='none')        
 
-        weights = cum_reward
-        weights[int(s_ratio * self.batch_size):] = torch.tensor(2.0).to(self.device)
-
-        weights = 5 * torch.log(weights + 1.6)
-        weights = weights.squeeze()
+        if self.SVD:
+            weights = cum_reward
+            weights[int(s_ratio * self.batch_size):] = torch.tensor(2.0).to(self.device)
+            weights = 5 * torch.log(weights + 1.6)
+            weights = weights.squeeze()
+        else:
+            weights = torch.ones_like(critic1_loss)
 
         critic1_loss = critic1_loss * weights
         critic2_loss = critic2_loss * weights
@@ -341,11 +344,6 @@ class VaLS(hyper_params):
         if log_data:
             wandb.log(
                 {'Critic/Critic1 Grad Norm': self.get_gradient(critic1_loss, params, 'Critic1')})
-
-        # if (critic1_loss > 20 or critic2_loss > 20) and self.email:
-        #     wandb.alert(title='Critic loss exploded',
-        #                 text=f'Critic loss is {critic1_loss}')
-        #     self.email = False
         
         z_sample, pdf, mu, std = self.eval_skill_policy(obs, params)
 

@@ -105,7 +105,7 @@ class HIVES(hyper_params):
                        wandb.Histogram(mu.detach().cpu())})
             wandb.log({'VAE/[decoder]reconstruction_std': rec.std(0).mean().detach().cpu(),
                        'VAE/MSE': error.mean().detach().cpu()})
-            if rec_loss < 5:
+            if rec_loss.mean() < 5:
                 wandb.log({'VAE/MSE Distribution':
                            wandb.Histogram(error.detach().cpu())})
 
