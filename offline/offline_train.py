@@ -12,7 +12,7 @@ from torch.distributions import Normal
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from utilities.optimization import Adam_update
-from utilities.utils import hyper_params
+from utilities.utils import hyper_params, compute_cum_rewards
 from models.nns import SkillPrior, LengthPrior
 from models.nns import Encoder, StateConditionedDecoder
 import wandb
@@ -65,7 +65,8 @@ class HIVES(hyper_params):
         for i, idx in enumerate(self.loader):
             action = torch.from_numpy(self.dataset['actions'][idx]).to(self.device)
             obs = torch.from_numpy(self.dataset['observations'][idx]).to(self.device)
-            recon_loss, kl_loss = self.vae_loss(action, obs, params, i)
+            cum_reward = torch.from_numpy(self.dataset['cum_rewards'][idx]).to(self.device)
+            recon_loss, kl_loss = self.vae_loss(action, obs, cum_reward, params, i)
             loss = recon_loss + beta * kl_loss
             losses = [loss]
             params_names = ['VAE_skills']
@@ -76,7 +77,7 @@ class HIVES(hyper_params):
         
         return params
 
-    def vae_loss(self, action, obs, params, i):
+    def vae_loss(self, action, obs, cum_reward, params, i):
         """VAE loss."""
         z_seq, pdf, mu, std = self.evaluate_encoder(action, params)
 
@@ -92,8 +93,10 @@ class HIVES(hyper_params):
         rec = torch.swapaxes(rec, 0, 1)
         
         error = torch.square(action - rec).mean(1)
-        rec_loss = -Normal(rec, 1).log_prob(action).sum(axis=-1)
-        rec_loss = rec_loss.mean()
+        rec_loss = -Normal(rec, 1).log_prob(action).sum(axis=-1).mean(1)
+        weights = F.sigmoid(cum_reward[:, -1])
+
+        rec_loss = rec_loss * weights
 
         if i == 0:
             wandb.log({'VAE/[encoder] STD':
@@ -107,9 +110,10 @@ class HIVES(hyper_params):
                            wandb.Histogram(error.detach().cpu())})
 
         N = Normal(0, 1)
-        kl_loss = torch.mean(kl_divergence(pdf, N))
+        kl_loss = kl_divergence(pdf, N).mean(1)
+        kl_loss = kl_loss * weights
 
-        return rec_loss, kl_loss
+        return rec_loss.mean(), kl_loss.mean()
 
     def evaluate_encoder(self, mu, params):
         """Evaluate encoder."""
@@ -188,9 +192,12 @@ class HIVES(hyper_params):
 
         This dataset requires to know when terminal states occur.
         """
-        data = torch.load(path)                 
+        data = torch.load(path)
+        data['rewards'] = np.where(data['rewards'] < 5, -.1, 10.0 ).astype(np.float32)
 
-        keys = ['actions', 'observations']
+        data = compute_cum_rewards(data)
+        
+        keys = ['actions', 'observations', 'cum_rewards']
         dataset = {}
         self.max_length = self.length
 

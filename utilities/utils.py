@@ -64,6 +64,7 @@ def params_extraction(models: list,
         Each dictionary contains params ready to use with functional
         call.
     """
+    
     params = OrderedDict()
     for model, name_m, pre_params in zip(models, names, pretrained_params):
         par = {}
@@ -130,6 +131,52 @@ def load_pretrained_models(args, folder, filename):
         pretrained_params.append(params['Target_critic2'])
         
     return pretrained_params
+
+
+def compute_cum_rewards(data, done_key='timeouts', max_reward=10.0):
+    """Compute cumulative reward (non-discounted).
+
+    In D4RL datasets, sometimes the episode continues even after the agent
+    has reached the goal. In those cases, the cumulative reward sum is
+    stopped at the step that the agent reached the goal.
+
+    The cumulative rewards are normalized with 0 mean and 1 std.
+
+    Parameters
+    ----------
+    data : dict
+        This should be a dictionary containing the data. The key keys are observations,
+        actions, rewards, timeouts/terminals.
+    done : str
+        This is the key that indicates if an episode is done. For D4RL it might terminals
+        or timeouts.
+    max_reward : float
+        If this reward is obtained, then the cumulative reward stops adding. By definition,
+        this is the reward at which the agent reaches the goal.
+    """   
+    done_idx = np.arange(data[done_key].shape[0])
+    done_idx = done_idx[data[done_key]]
+    done_idx = np.insert(done_idx, 0, 0)
+    done_idx = np.append(done_idx, data[done_key].shape[0])
+
+    cum_rewards = np.zeros(data[done_key].shape[0],dtype=np.float32)
+    cum_rew_unique = []
+
+    for j in range(done_idx.shape[0] - 1):
+        aux_rew = data['rewards'][done_idx[j]:done_idx[j + 1]]
+        mask = aux_rew == max_reward
+        if len(np.argwhere(mask)) > 0:
+            mask[np.argwhere(mask)[0]] = False  # This computes the index of the first True
+        # Note that an inverse mask is being used.
+        cum_reward = np.maximum(-20.0, np.sum(aux_rew[~mask]))
+        cum_rewards[done_idx[j]:done_idx[j + 1]] = cum_reward
+        cum_rew_unique.append(cum_reward)
+
+    cum_rew_stats = np.array(cum_rew_unique)
+
+    data['cum_rewards'] = (cum_rewards - cum_rew_stats.mean()) / (cum_rew_stats.std() + 1e-4)
+
+    return data
 
 
 def reset_params(params, keys, optimizers, lr):
