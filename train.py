@@ -56,7 +56,7 @@ config = {
     'delta_skill': 32,
     'delta_length': 32,
     'z_state_dim': 8,
-    'gradient_steps': 16,
+    'gradient_steps': 8,
     'max_iterations': int(100000 + 1),
     'buffer_size': int(100000 + 1),
     'test_freq': 100000,
@@ -69,8 +69,8 @@ config = {
     'Underparameter': False,
     
     # Run params
-    'train_VAE_models': True,
-    'train_priors': False,
+    'train_VAE_models': False,
+    'train_priors': True,
     'train_rl': False,
     'load_VAE_models': True,
     'load_prior_models': True,
@@ -87,7 +87,7 @@ def main(config=None):
     """Train all modules."""
     with wandb.init(project='SVD-Relocate-Offline', config=config,
                     notes='VAE training cloned data. With weights method',
-                    name='VAE weight cloned'):
+                    name='Test'):
 
         config = wandb.config
 

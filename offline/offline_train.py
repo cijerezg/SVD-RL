@@ -94,7 +94,8 @@ class HIVES(hyper_params):
         
         error = torch.square(action - rec).mean(1)
         rec_loss = -Normal(rec, 1).log_prob(action).sum(axis=-1).mean(1)
-        weights = F.sigmoid(cum_reward[:, -1])
+        with torch.no_grad():
+            weights = F.sigmoid(cum_reward[:, -1])
 
         rec_loss = rec_loss * weights
 
@@ -135,14 +136,16 @@ class HIVES(hyper_params):
         for i, idx in enumerate(self.loader):
             obs = self.dataset['observations'][idx][:, 0, :]
             obs = torch.from_numpy(obs).to(self.device)
-            prior_loss = self.skill_prior_loss(idx, obs, params, i)
+            cum_reward = torch.from_numpy(self.dataset['cum_rewards'][:, 0][idx]).to(self.device)
+
+            prior_loss = self.skill_prior_loss(idx, obs, cum_reward, params, i)
             name = ['SkillPrior']
             loss = [prior_loss]
             params = Adam_update(params, loss, name, optimizers, lr)
 
         return params
     
-    def skill_prior_loss(self, idx, obs, params, i):
+    def skill_prior_loss(self, idx, obs, cum_reward, params, i):
         """Compute loss for skill prior."""
 
         prior = functional_call(self.models['SkillPrior'],
@@ -151,7 +154,10 @@ class HIVES(hyper_params):
 
         pdf = Normal(self.loc[idx, :], self.scale[idx, :])
 
-        kl_loss = kl_divergence(prior, pdf)
+        with torch.no_grad():
+            weights = F.sigmoid(cum_reward)
+        kl_loss = kl_divergence(prior, pdf).mean(1)
+        kl_loss = kl_loss *  weights
 
         if i == 0:
             wandb.log({'skill_prior/KL loss': kl_loss.mean().detach().cpu()})
