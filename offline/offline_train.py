@@ -65,7 +65,7 @@ class HIVES(hyper_params):
         for i, idx in enumerate(self.loader):
             action = torch.from_numpy(self.dataset['actions'][idx]).to(self.device)
             obs = torch.from_numpy(self.dataset['observations'][idx]).to(self.device)
-            cum_reward = torch.from_numpy(self.dataset['cum_rewards'][idx]).to(self.device)
+            cum_reward = torch.from_numpy(self.dataset['norm_cum_rewards'][idx]).to(self.device)
             recon_loss, kl_loss = self.vae_loss(action, obs, cum_reward, params, i)
             loss = recon_loss + beta * kl_loss
             losses = [loss]
@@ -95,7 +95,7 @@ class HIVES(hyper_params):
         error = torch.square(action - rec).mean(1)
         rec_loss = -Normal(rec, 1).log_prob(action).sum(axis=-1).mean(1)
         with torch.no_grad():
-            weights = F.sigmoid(cum_reward[:, -1])
+            weights = F.sigmoid(cum_reward)
 
         rec_loss = rec_loss * weights
 
@@ -136,8 +136,7 @@ class HIVES(hyper_params):
         for i, idx in enumerate(self.loader):
             obs = self.dataset['observations'][idx][:, 0, :]
             obs = torch.from_numpy(obs).to(self.device)
-            cum_reward = torch.from_numpy(self.dataset['cum_rewards'][:, 0][idx]).to(self.device)
-
+            cum_reward = torch.from_numpy(self.dataset['norm_cum_rewards'][idx]).to(self.device)
             prior_loss = self.skill_prior_loss(idx, obs, cum_reward, params, i)
             name = ['SkillPrior']
             loss = [prior_loss]
@@ -201,7 +200,10 @@ class HIVES(hyper_params):
         data = torch.load(path)
         data['rewards'] = np.where(data['rewards'] < 5, -.1, 10.0 ).astype(np.float32)
 
-        data = compute_cum_rewards(data)
+        cum_rewards, norm_cum_rewards = compute_cum_rewards(data)
+        
+        data['cum_rewards'] = cum_rewards
+        data['norm_cum_rewads'] = norm_cum_rewards
         
         keys = ['actions', 'observations', 'cum_rewards']
         dataset = {}
@@ -238,6 +240,8 @@ class HIVES(hyper_params):
             seqs = np.take(data[key], idxs, axis=0)
             seqs = seqs.reshape(-1, self.max_length, val_dim).squeeze()
             dataset[key] = seqs
+
+        dataset['cum_rewards'] = dataset['cum_rewards'][:, 0] # All cum rewards are same.
 
         self.dataset = dataset
         self.indexes = torch.arange(self.dataset['actions'].shape[0])       

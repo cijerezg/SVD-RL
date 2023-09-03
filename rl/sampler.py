@@ -3,7 +3,7 @@
 import sys
 sys.path.insert(0, '../')
 
-from utilities.utils import hyper_params, AttrDict
+from utilities.utils import hyper_params, AttrDict, compute_cum_rewards
 import gymnasium as gym
 import numpy as np
 from torch.func import functional_call
@@ -27,8 +27,7 @@ class Sampler(hyper_params):
         self.eval_decoder = eval_decoder
         MAX_EPISODE_STEPS = 200
 
-        self.env = gym.make(self.env_id, max_episode_steps=MAX_EPISODE_STEPS,
-                            render_mode='human')
+        self.env = gym.make(self.env_id, max_episode_steps=MAX_EPISODE_STEPS)
 
         
     def skill_execution(self, actions, frames=None):
@@ -134,6 +133,7 @@ class ReplayBuffer(hyper_params):
         self.done_buf = np.zeros((size, 1), dtype=np.float32)
         self.tracker = np.zeros((size,), dtype=bool)
         self.cum_reward = np.zeros((size, 1), dtype=np.float32)
+        self.norm_cum_reward = np.zeros((size, 1), dtype=np.float32)        
         self.ptr, self.size, self.max_size = 0, 0, size
         self.idx_sampler = np.arange(size)
         self.idx_tracker = np.zeros((size, 1), dtype=np.float32)
@@ -172,6 +172,7 @@ class ReplayBuffer(hyper_params):
         rew = np.concatenate((self.rew_buf[idxs], self.offline_rew_buf[idxs_off]), axis=0)
         done = np.concatenate((self.done_buf[idxs], self.offline_done_buf[idxs_off]), axis=0)
         cum_r = np.concatenate((self.cum_reward[idxs], self.offline_cum_reward_buf[idxs_off]), axis=0)
+        norm_cum_r = np.concatenate((self.norm_cum_reward[idxs], self.offline_norm_cum_reward_buf[idxs_off]), axis=0)
 
         total_idxs = np.concatenate((idxs, idxs_off), axis=0)
 
@@ -182,44 +183,18 @@ class ReplayBuffer(hyper_params):
                          rewards=rew,
                          dones=done,
                          cum_reward=cum_r,
+                         norm_cum_reward=norm_cum_r,
                          idxs=total_idxs)
         return batch
 
-    def sample_recent_eps(self, batch_size=128):
-        idx = self.size
-        batch = AttrDict(observations=self.obs_buf[idx - batch_size:idx],
-                         next_observations=self.next_obs_buf[idx - batch_size:idx],
-                         z=self.z_buf[idx - batch_size:idx],
-                         next_z=self.next_z_buf[idx - batch_size:idx],
-                         rewards=self.rew_buf[idx - batch_size:idx],
-                         dones=self.done_buf[idx - batch_size:idx],
-                         tracker=self.tracker[idx - batch_size:idx])
-
-        return batch
 
     def update_tracking_buffers(self, ep_reward):
         last_ep_idx = np.where(self.done_buf[0:self.ptr - 1])[0].max() + 1
         self.cum_reward[last_ep_idx:self.ptr, :] = ep_reward
+        mean = self.cum_reward[0:self.ptr, :].mean()
+        std = self.cum_reward[0:self.ptr, :].std()
+        self.norm_cum_reward[0:self.ptr, :] = (self.cum_reward[0:self.ptr, :] - mean) / (std + 1e-4)
 
-
-    def prune_buffers(self, all_rewards):
-        all_rewards = np.array(all_rewards)[-500:]
-        self.threshold = np.percentile(all_rewards, 60)
-        self.tracker[self.cum_reward < self.threshold] = False
-        
-        vals = self.tracker.sum()
-        
-        self.obs_buf[0: vals] = self.obs_buf[self.tracker[:, 0], :]
-        self.next_obs_buf[0: vals] = self.next_obs_buf[self.tracker[:, 0], :]
-        self.z_buf[0: vals] = self.z_buf[self.tracker[:, 0], :]
-        self.next_z_buf[0: vals] = self.next_z_buf[self.tracker[:, 0], :]        
-        self.rew_buf[0: vals] = self.rew_buf[self.tracker[:, 0], :]
-        self.done_buf[0: vals] = self.done_buf[self.tracker[:, 0], :]
-        self.cum_reward[0: vals] = self.cum_reward[self.tracker[:, 0], :]
-
-        self.ptr, self.size = vals, vals
-        
-        return self.threshold
 
     def log_offline_dataset(self, path, params, eval_encoder, device):
         dataset = torch.load(path)
@@ -253,16 +228,12 @@ class ReplayBuffer(hyper_params):
         self.offline_rew_buf = dataset['rewards'][0::self.length]
         self.offline_done_buf = dataset['timeouts'][self.length-1::self.length]
 
-        timeouts = dataset['timeouts']
-        timeouts[-1] = True
+        cum_rewards, norm_cum_rewards = compute_cum_rewards(dataset)
+        self.offline_cum_reward_buf = cum_rewards
+        self.offline_norm_cum_reward_buf = norm_cum_rewards - 1
 
-        aux_val = dataset['rewards'][dataset['timeouts']]
-
-        done_idx = np.arange(dataset['timeouts'].shape[0])
-        done_idx = done_idx[dataset['timeouts']]
-        done_idx = np.insert(done_idx, 0, 0)
-        self.offline_cum_reward_buf = np.repeat(aux_val, np.diff(done_idx))
         self.offline_cum_reward_buf = self.offline_cum_reward_buf[0::self.length]
+        self.offline_norm_cum_reward_buf = self.offline_norm_cum_reward_buf[0::self.length]
 
         self.offline_next_obs_buf[0:self.offline_size - 1, :] = self.offline_obs_buf[1:, :]
         self.offline_next_z_buf[0:self.offline_size - 1, :] = self.offline_z_buf[1:, :]
@@ -273,7 +244,9 @@ class ReplayBuffer(hyper_params):
         self.offline_next_z_buf = self.offline_next_z_buf[~self.offline_done_buf, :]
         self.offline_rew_buf = self.offline_rew_buf[~self.offline_done_buf].reshape(-1, 1)
         self.offline_cum_reward_buf = self.offline_cum_reward_buf[~self.offline_done_buf].reshape(-1, 1)
+        self.offline_norm_cum_reward_buf = self.offline_norm_cum_reward_buf[~self.offline_done_buf].reshape(-1, 1)
         self.offline_done_buf = self.offline_done_buf[~self.offline_done_buf].reshape(-1, 1)
+        
         self.offline_size = self.offline_obs_buf.shape[0]
         
     def d4rl_reward_map(self, reward):

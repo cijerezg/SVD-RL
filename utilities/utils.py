@@ -161,7 +161,6 @@ def compute_cum_rewards(data, done_key='timeouts', max_reward=10.0):
 
     cum_rewards = np.zeros(data[done_key].shape[0],dtype=np.float32)
     cum_rew_unique = []
-
     for j in range(done_idx.shape[0] - 1):
         aux_rew = data['rewards'][done_idx[j]:done_idx[j + 1]]
         mask = aux_rew == max_reward
@@ -174,9 +173,9 @@ def compute_cum_rewards(data, done_key='timeouts', max_reward=10.0):
 
     cum_rew_stats = np.array(cum_rew_unique)
 
-    data['cum_rewards'] = (cum_rewards - cum_rew_stats.mean()) / (cum_rew_stats.std() + 1e-4)
+    norm_cum_rewards = (cum_rewards - cum_rew_stats.mean()) / (cum_rew_stats.std() + 1e-4)
 
-    return data
+    return cum_rewards, norm_cum_rewards
 
 
 def reset_params(params, keys, optimizers, lr):

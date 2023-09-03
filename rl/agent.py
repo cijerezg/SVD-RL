@@ -158,6 +158,8 @@ class VaLS(hyper_params):
             
             for i in range(self.gradient_steps):
                 policy_losses, critic1_loss, critic2_loss = self.losses(params, log_data, ref_params)
+                if self.Underparameter:
+                    pdb.set_trace()
                 losses = [*policy_losses, critic1_loss, critic2_loss]
                 names = ['SkillPolicy', 'Critic1', 'Critic2']
                 params = Adam_update(params, losses, names, optimizers, lr)
@@ -187,6 +189,7 @@ class VaLS(hyper_params):
         rew = torch.from_numpy(batch.rewards).to(self.device)
         dones = torch.from_numpy(batch.dones).to(self.device)
         cum_reward = torch.from_numpy(batch.cum_reward).to(self.device)
+        norm_cum_reward = torch.from_numpy(batch.norm_cum_reward).to(self.device)
         idxs = torch.from_numpy(batch.idxs).to(self.device)
         
         if log_data:
@@ -240,7 +243,6 @@ class VaLS(hyper_params):
 
             vals = np.array(vals)
             hist = (vals, bins)
-
             wandb.log({'Logged idx': wandb.Histogram(np_histogram=hist)})
                                                                  
         ####
@@ -275,7 +277,7 @@ class VaLS(hyper_params):
 
             else:
                 q_target1, q_target2 = self.eval_critic(target_critic_arg, params,
-                                                        target_critc=True)
+                                                        target_critic=True)
             
         q_target = torch.cat((q_target1, q_target2), dim=1)
         q_target, _ = torch.min(q_target, dim=1)
@@ -299,8 +301,6 @@ class VaLS(hyper_params):
             
             bellman_terms_updated = self.log_scatter_3d(q1, q_target.unsqueeze(dim=1), cum_reward, idxs_batch,
                                                         'Q val', 'Q refs', 'Cum reward', 'Iters')
-
-            d1, d2, d3 = self.distance_to_target_env(obs)
             
             with torch.no_grad():
                 diff_Q = q1 - q_refs
@@ -309,14 +309,11 @@ class VaLS(hyper_params):
             diff_Qs = self.log_scatter_3d(diff_Q, diff_Qt, cum_reward, idxs.unsqueeze(dim=1),
                                           'Diff Qs', 'Diff Q targets', 'Cum rewards', 'Idxs')
 
-            eval_crit = self.log_scatter_3d(d1, d2, d3, q1, 'Palm to ball', 'Palm to target',
-                                            'Ball to target', 'Qval')
 
             wandb.log({'Critic/Distance critic to target 1': dist1,
                        'Critic/Bellman terms': bellman_terms,
                        'Critic/Bellman ref terms': bellman_terms_ref,
                        'Critic/Diff Qs refs': diff_Qs,
-                       'Critic/Eval critic': eval_crit,
                        'Critic/Bellman terms counts': bellman_terms_updated})
 
         q_target = rew + (0.97 * q_target).reshape(-1, 1) * (1 - dones)
@@ -328,10 +325,8 @@ class VaLS(hyper_params):
                                   reduction='none')        
 
         if self.SVD:
-            weights = cum_reward
-            weights[int(s_ratio * self.batch_size):] = torch.tensor(2.0).to(self.device)
-            weights = 5 * torch.log(weights + 1.6)
-            weights = weights.squeeze()
+            with torch.no_grad():
+                weights = F.sigmoid(norm_cum_reward)
         else:
             weights = torch.ones_like(critic1_loss)
 
@@ -353,9 +348,9 @@ class VaLS(hyper_params):
         q_pi = torch.cat((q_pi1, q_pi2), dim=1)
         q_pi, _ = torch.min(q_pi, dim=1)
         
-        if self.use_SAC:
+        if self.SAC or self.Replayratio or self.Underparameter:
             skill_prior = torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
-        else:
+        elif self.SPiRL or self.SVD:
             skill_prior = torch.clamp(kl_divergence(pdf, z_prior), max=MAX_SKILL_KL).mean()
         
         alpha_skill = torch.exp(self.log_alpha_skill).detach()
@@ -542,36 +537,40 @@ class VaLS(hyper_params):
                 optimizers[model] = Adam(params[model].values(), lr)
 
         return params, optimizers
-                    
-    def select_policy(self, params, done, obs):
-        if done or obs is None:
-            self.policy_use = self.policy_use
-        else:
-            obs = np.array(obs, dtype=np.float32)
-            obs = torch.from_numpy(obs).to(self.device)
-            obs = obs.reshape(1, -1)
-            zs = []
-            with torch.no_grad():
-                for i in [0, 1]:
-                    z, _, _, _ = self.eval_skill_policy(obs, params, i)
-                    zs.append(z)
-                zs = torch.cat(zs, dim=0)
-                obs = obs.repeat(2, 1)
-                q_arg = torch.cat([obs, zs], dim=1)
-                q_pi1, q_pi2 = self.eval_critic(q_arg, params)
-                q_pi = torch.cat((q_pi1, q_pi2), dim=1)
-                q_pi, _ = torch.min(q_pi, dim=1)
-                self.policy_use = q_pi.argmax().item()
-                # item() is used to extract the value and eliminate tensors.
 
-    def distance_to_target_env(self, obs):
-        ds = obs[:, -9:]
-        d1 = torch.norm(ds[:, 0:3], dim=1).unsqueeze(dim=1)  # Palm to ball
-        d2 = torch.norm(ds[:, 3:6], dim=1).unsqueeze(dim=1)  # Palm to target
-        d3 = torch.norm(ds[:, 6:9], dim=1).unsqueeze(dim=1)  # Ball to target
-
-        return d1, d2, d3
-                                                   
+    def compute_singular_vals_loss(self, params):
+        models = ['Critic1', 'Critic2', 'SkillPolicy']
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        # TODO
+        
 
     def get_gradient(self, x, params, key):
         grads = autograd.grad(x, params[key].values(), retain_graph=True,
