@@ -59,14 +59,14 @@ config = {
     'gradient_steps': 8,
     'max_iterations': int(100000 + 1),
     'buffer_size': int(100000 + 1),
-    'test_freq': 100000,
-    'reset_frequency': 10000,
+    'test_freq': 40000,
+    'reset_frequency': 12500,
     'singular_val_k': 1,
 
     # Algo selection params
-    'SVD': False,
+    'SVD': True,
     'Replayratio': False,
-    'Underparameter': True,
+    'Underparameter': False,
     'SAC': False,
     'SPiRL': False,
     

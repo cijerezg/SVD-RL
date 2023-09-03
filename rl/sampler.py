@@ -81,7 +81,6 @@ class Sampler(hyper_params):
                 rew_trj.append(rew)
                 done_trj.append(done)
 
-
         if frames is not None:
             done = True if sum(done_trj) > 0 else False
             return obs_trj[-1], done, frames
@@ -95,10 +94,7 @@ class Sampler(hyper_params):
                                                      next_obs_t)
            
         next_obs = obs_trj[-1]
-        if self.env_key == 'kitchen':
-            rew = sum(rew_trj)
-        elif self.env_key == 'adroit':
-            rew = rew_trj[-1]
+        rew = sum(rew_trj)
 
         z = z_sample.cpu().numpy()
         next_z = next_z_sample.cpu().numpy()

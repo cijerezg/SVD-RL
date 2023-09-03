@@ -58,7 +58,7 @@ class VaLS(hyper_params):
         self.total_episode_counter = 0
         self.reward_logger = [0]
         self.log_data = 0
-        self.log_data_freq = 200
+        self.log_data_freq = 500
         self.email = True
         
     def training(self, params, optimizers, path, name):
@@ -92,10 +92,6 @@ class VaLS(hyper_params):
                 wandb.log({'Iterations': self.iterations})
             self.iterations += 1
 
-            if self.iterations == int(self.reset_frequency * 3 / 4):
-                ref_params = copy.deepcopy(params)
-
-
             if self.SVD or self.Replayratio:
                 if self.iterations % self.reset_frequency == 0:
                     if self.SVD:
@@ -104,9 +100,13 @@ class VaLS(hyper_params):
                     self.interval_iteration = 0
                     keys = ['SkillPolicy', 'Critic1', 'Critic2']
                     ref_params = copy.deepcopy(params)
-                    #params, optimizers = reset_params(params, keys, optimizers, self.actor_lr)
-                    params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.actor_lr)
-                    self.singular_val_k = 2 * self.singular_val_k
+                    
+                    if self.Replayratio:
+                        params, optimizers = reset_params(params, keys, optimizers, self.actor_lr)
+                    elif self.SVD:
+                        params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.actor_lr)
+                        self.singular_val_k = 2 * self.singular_val_k
+                        
                     self.log_alpha_skill = torch.tensor(INIT_LOG_ALPHA, dtype=torch.float32,
                                                         requires_grad=True,
                                                         device=self.device)
@@ -128,17 +128,13 @@ class VaLS(hyper_params):
 
         next_obs, rew, z, next_z, done = data
 
-        if self.env_key == 'kitchen':
-            self.reward_per_episode += rew
-        elif self.env_key == 'adroit':
-            self.reward_per_episode = rew
+        self.reward_per_episode += rew
 
         self.experience_buffer.add(obs, next_obs, z, next_z, rew, done)
 
         if done:
             if self.total_episode_counter > 2:
                 self.experience_buffer.update_tracking_buffers(self.reward_per_episode)
-
             wandb.log({'Reward per episode': self.reward_per_episode,
                        'Total episodes': self.total_episode_counter})
 
@@ -157,8 +153,10 @@ class VaLS(hyper_params):
         if self.experience_buffer.size > self.batch_size:
             
             for i in range(self.gradient_steps):
+                log_data = log_data if i == 0 else False # Only log data once for multi grad steps.
                 policy_losses, critic1_loss, critic2_loss = self.losses(params, log_data, ref_params)
                 if self.Underparameter:
+                    # TODO
                     pdb.set_trace()
                 losses = [*policy_losses, critic1_loss, critic2_loss]
                 names = ['SkillPolicy', 'Critic1', 'Critic2']
@@ -179,7 +177,11 @@ class VaLS(hyper_params):
         return params, next_obs, done
 
     def losses(self, params, log_data, ref_params):
-        s_ratio = np.exp(- 4 * self.iterations / self.max_iterations - .7)
+        if self.SVD:
+            s_ratio = np.exp(- 4 * self.iterations / self.max_iterations - .7)
+        elif self.Replayratio or self.SAC or self.SPiRL or self.Underpameter:
+            s_ratio = 0.0
+
         batch = self.experience_buffer.sample(batch_size=self.batch_size, s_ratio=s_ratio)       
 
         obs = torch.from_numpy(batch.observations).to(self.device)
@@ -269,8 +271,8 @@ class VaLS(hyper_params):
                 q_target1, q_target2 = q_target1.reshape(-1, trials, 1), q_target2.reshape(-1, trials, 1)
                 q_target1, q_target2 = q_target1.mean(1), q_target2.mean(1)
                 if log_data:
-                    stds = q_target1.std(1)
-                    means = q_target1.mean(1)                    
+                    stds = q_target1.std(1).reshape(-1, 1)
+                    means = q_target1.mean(1).reshape(-1, 1)        
                     heatmap_Q_explore = self.log_histogram_2d(means, stds, 'Means', 'STDs')
                     wandb.log({'Critic/Q variation': heatmap_Q_explore})
 
@@ -326,7 +328,7 @@ class VaLS(hyper_params):
 
         if self.SVD:
             with torch.no_grad():
-                weights = F.sigmoid(norm_cum_reward)
+                weights = F.sigmoid(norm_cum_reward).squeeze()
         else:
             weights = torch.ones_like(critic1_loss)
 
