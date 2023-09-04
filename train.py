@@ -56,11 +56,11 @@ config = {
     'delta_skill': 32,
     'delta_length': 32,
     'z_state_dim': 8,
-    'gradient_steps': 8,
-    'max_iterations': int(100000 + 1),
-    'buffer_size': int(100000 + 1),
+    'gradient_steps': 16,
+    'max_iterations': int(80000 + 1),
+    'buffer_size': int(80000 + 1),
     'test_freq': 40000,
-    'reset_frequency': 12500,
+    'reset_frequency': 10000,
     'singular_val_k': 1,
 
     # Algo selection params
@@ -86,8 +86,8 @@ path_to_data = f'datasets/{ENV_NAME}.pt'
 
 def main(config=None):
     """Train all modules."""
-    with wandb.init(project='SVD-Relocate-Offline', config=config,
-                    notes='VAE training cloned data. With weights method',
+    with wandb.init(project='SVD-Relocate-Online', config=config,
+                    notes='SVD RL training cloned data. With weights method',
                     name='Test'):
 
         config = wandb.config
@@ -125,7 +125,7 @@ def main(config=None):
         names = [*hives.names, 'SkillPolicy', 'Critic1', 'Target_critic1',
                  'Critic2', 'Target_critic2']
     
-        params_path = 'Prior/params_29-08-2023-10_39_48_offline.pt'
+        params_path = 'Prior/params_04-09-2023-02_43_11_offline.pt'
         
         pretrained_params = load_pretrained_models(config, PARENT_FOLDER, params_path)
         pretrained_params.extend([None] * (len(names) - len(pretrained_params)))

@@ -94,10 +94,9 @@ class HIVES(hyper_params):
         
         error = torch.square(action - rec).mean(1)
         rec_loss = -Normal(rec, 1).log_prob(action).sum(axis=-1).mean(1)
+
         with torch.no_grad():
             weights = F.sigmoid(cum_reward)
-
-        rec_loss = rec_loss * weights
 
         if i == 0:
             wandb.log({'VAE/[encoder] STD':
@@ -109,6 +108,8 @@ class HIVES(hyper_params):
             if rec_loss.mean() < 5:
                 wandb.log({'VAE/MSE Distribution':
                            wandb.Histogram(error.detach().cpu())})
+
+        rec_loss = rec_loss * weights
 
         N = Normal(0, 1)
         kl_loss = kl_divergence(pdf, N).mean(1)
@@ -203,9 +204,9 @@ class HIVES(hyper_params):
         cum_rewards, norm_cum_rewards = compute_cum_rewards(data)
         
         data['cum_rewards'] = cum_rewards
-        data['norm_cum_rewads'] = norm_cum_rewards
+        data['norm_cum_rewards'] = norm_cum_rewards
         
-        keys = ['actions', 'observations', 'cum_rewards']
+        keys = ['actions', 'observations', 'norm_cum_rewards']
         dataset = {}
         self.max_length = self.length
 
@@ -241,7 +242,7 @@ class HIVES(hyper_params):
             seqs = seqs.reshape(-1, self.max_length, val_dim).squeeze()
             dataset[key] = seqs
 
-        dataset['cum_rewards'] = dataset['cum_rewards'][:, 0] # All cum rewards are same.
+        dataset['norm_cum_rewards'] = dataset['norm_cum_rewards'][:, 0] # All cum rewards are same.
 
         self.dataset = dataset
         self.indexes = torch.arange(self.dataset['actions'].shape[0])       

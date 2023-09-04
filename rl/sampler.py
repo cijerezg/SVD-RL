@@ -74,12 +74,15 @@ class Sampler(hyper_params):
                 action = action.cpu().detach().numpy()
                 action = action.squeeze()
                 obs, rew, _, done, info = self.env.step(action)
+                # Relocate environment does not use done. It uses info.
                 obs_t = torch.from_numpy(obs).to(self.device).to(torch.float32)
-                
+                done = True if done or info['success'] else False
                 # Collect trajectories
                 obs_trj.append(obs)
                 rew_trj.append(rew)
                 done_trj.append(done)
+                if done:                    
+                    break
 
         if frames is not None:
             done = True if sum(done_trj) > 0 else False

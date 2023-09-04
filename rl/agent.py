@@ -298,11 +298,6 @@ class VaLS(hyper_params):
                                                 'Q val', 'Q target', 'Reward', 'Cum reward')
             bellman_terms_ref = self.log_scatter_3d(q1, q_refs, cum_reward, idxs.unsqueeze(dim=1),
                                                     'Q val', 'Q refs', 'Cum reward', 'Idxs')
-
-            idxs_batch = torch.tensor(self.experience_buffer.idx_tracker[idxs.cpu()])
-            
-            bellman_terms_updated = self.log_scatter_3d(q1, q_target.unsqueeze(dim=1), cum_reward, idxs_batch,
-                                                        'Q val', 'Q refs', 'Cum reward', 'Iters')
             
             with torch.no_grad():
                 diff_Q = q1 - q_refs
@@ -315,8 +310,7 @@ class VaLS(hyper_params):
             wandb.log({'Critic/Distance critic to target 1': dist1,
                        'Critic/Bellman terms': bellman_terms,
                        'Critic/Bellman ref terms': bellman_terms_ref,
-                       'Critic/Diff Qs refs': diff_Qs,
-                       'Critic/Bellman terms counts': bellman_terms_updated})
+                       'Critic/Diff Qs refs': diff_Qs})
 
         q_target = rew + (0.97 * q_target).reshape(-1, 1) * (1 - dones)
         q_target = torch.clamp(q_target, min=-100, max=100)
