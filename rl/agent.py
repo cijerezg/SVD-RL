@@ -29,6 +29,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import math
 
+
 MAX_SKILL_KL = 100
 INIT_LOG_ALPHA = 0
 
@@ -166,13 +167,13 @@ class VaLS(hyper_params):
                 polyak_update(params['Critic2'].values(),
                               params['Target_critic2'].values(), 0.005)
 
-            if log_data:
-                with torch.no_grad():
-                    dist_init1 = self.distance_to_params(params, ref_params, 'Critic1', 'Critic1')
-                    dist_init_pol = self.distance_to_params(params, ref_params, 'SkillPolicy', 'SkillPolicy')
+                if log_data:
+                    with torch.no_grad():
+                        dist_init1 = self.distance_to_params(params, ref_params, 'Critic1', 'Critic1')
+                        dist_init_pol = self.distance_to_params(params, ref_params, 'SkillPolicy', 'SkillPolicy')
                     
-                wandb.log({'Critic/Distance to init weights': dist_init1,
-                           'Policy/Distance to init weights Skills': dist_init_pol}) 
+                        wandb.log({'Critic/Distance to init weights': dist_init1,
+                                   'Policy/Distance to init weights Skills': dist_init_pol}) 
            
         return params, next_obs, done
 
@@ -196,6 +197,9 @@ class VaLS(hyper_params):
         
         if log_data:
             singular_vals = self.compute_singular_vals(params)
+            if self.save_data:
+                np.save(f'results/relocate/singular_vals{self.iterations}.npy',
+                        singular_vals, allow_pickle=True)
 
             for log_name, log_val in singular_vals.items():
                 wandb.log({log_name: wandb.Histogram(log_val)})

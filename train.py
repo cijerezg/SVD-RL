@@ -64,11 +64,13 @@ config = {
     'singular_val_k': 1,
 
     # Algo selection params
-    'SVD': True,
+    'SVD': False,
     'Replayratio': False,
     'Underparameter': False,
     'SAC': False,
-    'SPiRL': False,
+    'SPiRL': True,
+
+    'save_data': True,
     
     # Run params
     'train_VAE_models': False,
@@ -88,7 +90,7 @@ def main(config=None):
     """Train all modules."""
     with wandb.init(project='SVD-Relocate-Online', config=config,
                     notes='SVD RL training cloned data. With weights method',
-                    name='Test'):
+                    name='Test data'):
 
         config = wandb.config
 
