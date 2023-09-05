@@ -134,3 +134,4 @@ wandb/
 checkpoints_relocate/New_Baseline/
 datasets/
 *class
+results/
