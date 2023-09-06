@@ -64,13 +64,13 @@ config = {
     'singular_val_k': 1,
 
     # Algo selection params
-    'SVD': False,
+    'SVD': True,
     'Replayratio': False,
     'Underparameter': False,
     'SAC': False,
-    'SPiRL': True,
+    'SPiRL': False,
 
-    'save_data': True,
+    'save_data': False,
     
     # Run params
     'train_VAE_models': False,

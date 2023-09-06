@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
 import os
-import joypy
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import pdb
+
+sns.set_theme(style='whitegrid')
 
 def get_file_index(filename: str) -> int:
     """Extract the index from the filename."""
@@ -26,21 +28,39 @@ def get_data_from_files(path: str, key: str) -> pd.DataFrame:
                 data[index] = file_data[key].numpy().flatten()
     return pd.DataFrame.from_dict(data, orient='index')
 
-def color_gradient(x=0.0, start=(0, 0, 0), stop=(1, 1, 1)):
-    r = np.interp(x, [0, 1], [start[0], stop[0]])
-    g = np.interp(x, [0, 1], [start[1], stop[1]])
-    b = np.interp(x, [0, 1], [start[2], stop[2]])
-    return (r, g, b)
 
 
+def plot_singular_vals(path, keys):
+    fig, axes = plt.subplots(len(keys), 1, figsize=(15, 10))
+                             #layout='constrained')
 
+    for i, key in enumerate(keys):
+        df = get_data_from_files(path, key)
+
+        df = df.stack().reset_index(level=0)
+        df.columns = ['index', 'value']
+        df['index'] = df['index'] / 100
+        
+        sns.histplot(df, x='index', y='value', ax=axes[i])
+        axes[i].xaxis.grid()
+        axes[i].tick_params(axis='both', labelsize=18)
+        axes[i].set_ylabel('')
+        axes[i].set_xlabel('')
+        if i == 0:
+            axes[i].set_xticks([])
+            axes[i].set_xticklabels([])
+
+    fig.supxlabel('Environment steps (1e3)', fontsize=20,y=0.02)
+    fig.supylabel('Singular values', fontsize=20, x=0.06)
+    key = key.replace('/', "")
+    plt.savefig(f'figures/singular_vals{key}.png', bbox_inches='tight')
+    plt.close()
+        
+
+        
 path = 'results/relocate'
-key = 'Critic/embed_obs.weight - singular vals'
+keys = ['Critic/embed_obs.weight - singular vals',
+       'Critic/post_pol.weight - singular vals']
 
-df = get_data_from_files(path, key)
 
-
-joypy.joyplot(df.transpose(), overlap=2,
-              colormap=lambda x: color_gradient(x),
-              linecolor='w', linewidth=.5)
-plt.show()
+plot_singular_vals(path, keys)
