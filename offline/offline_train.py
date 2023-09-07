@@ -210,10 +210,10 @@ class HIVES(hyper_params):
         dataset = {}
         self.max_length = self.length
 
-        if 'adroit' in self.env_key:
-            terminal_key = 'timeouts'
-        elif 'kitchen' in self.env_key or 'ant' in self.env_key:
+        if 'kitchen' in self.env_key:
             terminal_key = 'terminals'
+        else:
+            terminal_key = 'timeouts'
 
         terminal_idxs = np.arange(len(data[terminal_key]))
         terminal_idxs = terminal_idxs[data[terminal_key]]

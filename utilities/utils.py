@@ -35,8 +35,12 @@ class hyper_params:
     def env_dims(self, env_id):
         """Get action and observation dimensions."""
         env = gym.make(env_id)
-        action_dim = env.action_space.shape[0]
-        state_dim = env.observation_space.shape[0]
+        if 'Ant' in env_id:
+            action_dim = env.action_space.sample().shape[0]
+            state_dim = env.observation_space.sample()['observation'].shape[0]
+        else:
+            action_dim = env.action_space.shape[0]
+            state_dim = env.observation_space.shape[0]
         env.close()
         del env
         return action_dim, state_dim

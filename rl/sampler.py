@@ -73,10 +73,13 @@ class Sampler(hyper_params):
                 action = self.eval_decoder(obs_t, params)
                 action = action.cpu().detach().numpy()
                 action = action.squeeze()
-                obs, rew, _, done, info = self.env.step(action)
+                obs, rew, terminated, truncated, info = self.env.step(action)
                 # Relocate environment does not use done. It uses info.
                 obs_t = torch.from_numpy(obs).to(self.device).to(torch.float32)
-                done = True if done or info['success'] else False
+                done = True if terminated or truncated else False
+                if self.env_key == 'adroit':
+                    done = True if info['success'] else done
+
                 # Collect trajectories
                 obs_trj.append(obs)
                 rew_trj.append(rew)
@@ -124,8 +127,8 @@ class ReplayBuffer(hyper_params):
     def __init__(self, size, env, lat_dim, reset_ratio, args):
         super().__init__(args)
 
-        self.obs_buf = np.zeros((size, *env.observation_space.shape), dtype=np.float32)
-        self.next_obs_buf = np.zeros((size, *env.observation_space.shape), dtype=np.float32)
+        self.obs_buf = np.zeros((size, self.state_dim), dtype=np.float32)
+        self.next_obs_buf = np.zeros((size, self.state_dim), dtype=np.float32)
         self.z_buf = np.zeros((size, lat_dim), dtype=np.float32)
         self.next_z_buf = np.zeros((size, lat_dim), dtype=np.float32)
         self.rew_buf = np.zeros((size, 1), dtype=np.float32)
@@ -204,7 +207,7 @@ class ReplayBuffer(hyper_params):
         self.offline_size = int(total_size / self.length)
         iters = 5000
 
-        self.offline_next_obs_buf = np.zeros((self.offline_size, *self.env.observation_space.shape),
+        self.offline_next_obs_buf = np.zeros((self.offline_size, self.state_dim),
                                              dtype=np.float32)
         self.offline_z_buf = np.zeros((self.offline_size, self.lat_dim), dtype=np.float32)
         self.offline_next_z_buf = np.zeros((self.offline_size, self.lat_dim), dtype=np.float32)

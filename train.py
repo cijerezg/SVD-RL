@@ -28,9 +28,15 @@ os.environ['WANDB_SILENT'] = "true"
 
 wandb.login()
 
-ENV_NAME = 'AdroitHandRelocateSparse-v1'
-PARENT_FOLDER = 'checkpoints_relocate'
-CASE_FOLDER = 'New_Baseline'
+# The ids for envs are:
+# AdroitHandRelocateSparse-v1
+# AdroitHandPenSparse-v1
+# AntMaze_Medium-v3
+# FrankaKitchen-v1
+
+ENV_NAME = 'AntMaze_Medium-v3'
+PARENT_FOLDER = 'checkpoints_ant'
+CASE_FOLDER = 'Baseline'
 
 config = {
     # General hyperparams
@@ -76,8 +82,8 @@ config = {
     'train_VAE_models': False,
     'train_priors': False,
     'train_rl': True,
-    'load_VAE_models': True,
-    'load_prior_models': True,
+    'load_VAE_models': False,
+    'load_prior_models': False,
     'load_rl_models': False,
     'render_results': False
 }
