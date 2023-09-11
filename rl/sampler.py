@@ -35,14 +35,18 @@ class Sampler(hyper_params):
                                               obs_t)
 
             action = action.cpu().numpy()
-        
+
         obs, reward, terminated, truncated, info = self.env.step(action)
+
         if isinstance(obs, dict):
             obs = self.convert_obs_dict_to_array(obs)
 
         done = True if terminated or truncated else False
 
-        if self.env_key == 'relocate' or self.env_key == 'pen':
+        if 'Fetch' in self.env_key:
+            done = True if info['is_success'] > 0.0 else done
+
+        elif 'Adroit' in self.env_key:
             done = True if info['success'] else done
 
         next_obs = obs

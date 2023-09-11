@@ -36,7 +36,7 @@ wandb.login()
 # FetchPickAndPlace-v2
 # FetchPush-v2
 
-ENV_NAME = 'FetchPickAndPlace-v2'
+ENV_NAME = 'FrankaKitchen-v1'
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'

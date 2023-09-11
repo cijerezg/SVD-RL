@@ -125,6 +125,7 @@ class VaLS(hyper_params):
         next_obs, rew, z, next_z, done = data
 
         self.reward_per_episode += rew
+        print(f'Ep reward {self.reward_per_episode}')
 
         self.experience_buffer.add(obs, next_obs, z, next_z, rew, done)
 
@@ -290,10 +291,8 @@ class VaLS(hyper_params):
         q_pi = torch.cat((q_pi1, q_pi2), dim=1)
         q_pi, _ = torch.min(q_pi, dim=1)
         
+        skill_prior = -torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
 
-        skill_prior = torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
-
-        
         alpha_skill = torch.exp(self.log_alpha_skill).detach()
         skill_prior_loss = alpha_skill * skill_prior
 
