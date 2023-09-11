@@ -39,10 +39,10 @@ class Sampler(hyper_params):
         obs, reward, terminated, truncated, info = self.env.step(action)
 
         done = True if terminated or truncated else False
-        if self.env_key == 'adroit':
+
+        if self.env_key == 'relocate' or self.env_key == 'pen':
             done = True if info['success'] else done
 
-            
         next_obs = obs
         next_obs_t = torch.from_numpy(next_obs).to(self.device).to(torch.float32)
 
