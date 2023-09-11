@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
 
-LOG_STD_MAX = 2
+LOG_STD_MAX = 1.5
 LOG_STD_MIN = -20
 
         
@@ -142,132 +142,6 @@ def create_mlp(
     return modules
 
 
-LOG_STD_MAX = 2
-LOG_STD_MIN = -20
-
-
-# class Encoder(nn.Module):
-#     def __init__(self, H_dim, input_dim, latent_dim=12, lstm_hidden=128, enc_size=64):
-#         super().__init__()
-#         self.embed = nn.Linear(input_dim, lstm_hidden)
-#         self.lstm = nn.LSTM(input_size=lstm_hidden, hidden_size=lstm_hidden, batch_first=True)
-
-#         self.out = nn.Linear(lstm_hidden, enc_size)
-#         self.fc_mu = nn.Linear(enc_size, latent_dim)
-#         self.fc_log_std = nn.Linear(enc_size, latent_dim)
-#         self.lstm_hidden = lstm_hidden
-#         self.latent_dim = latent_dim
-
-#     def forward(self, x):
-#         # x: [batch, seq_len, input_size]
-#         batch_size, input_size = x.shape[0], x.shape[-1]
-#         x = x.reshape(-1, input_size)  # [batch*seq_len, input_size]
-#         embed = self.embed(x)
-#         embed = embed.reshape(batch_size, -1, self.lstm_hidden)  # [batch, seq_len, lstm_hidden]
-
-#         o, _ = self.lstm(embed)  # [batch, seq_len, lstm_hidden]
-#         o = o[:, -1, :]  # take last output cell
-
-#         o = F.relu(self.out(o))
-#         mu = self.fc_mu(o)
-#         log_std = self.fc_log_std(o)
-#         std = torch.exp(torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX))
-        
-#         density = Normal(mu, std)
-#         sample = density.rsample()
-
-#         return sample, density, mu, std
-
-
-# class Decoder(nn.Module):
-#     def __init__(self, H_dim, output_dim, input_dim=12, lstm_hidden=128, dec_size=64):
-#         super().__init__()
-#         self.lstm_hidden = lstm_hidden
-#         self.output_dim = output_dim
-#         self.H_dim = H_dim
-
-#         self.embed = nn.Linear(input_dim, lstm_hidden)  # input_dim=latent_dim
-#         self.lstm = nn.LSTM(input_size=lstm_hidden, hidden_size=lstm_hidden, batch_first=True)
-
-#         self.out = nn.Linear(lstm_hidden, dec_size)
-#         self.action_layer = nn.Linear(dec_size, output_dim)
-
-#     def forward(self, x):
-#         # x: [batch, latent_dim]
-#         x = x.view(x.shape[0], 1, x.shape[-1]).repeat(1, self.H_dim, 1)  # x: [batch, seq_len, latent_dim]
-#         batch_size, _, input_size = x.shape
-#         x = x.reshape(-1, input_size)  # [batch*seq_len, input_size]
-#         embed = self.embed(x)  # [batch*seq_len, lstm_hidden]
-#         embed = embed.reshape(batch_size, -1, self.lstm_hidden)
-#         o, _ = self.lstm(embed)
-#         o = o.reshape(-1, self.lstm_hidden)
-#         o = F.relu(self.out(o))
-#         action = self.action_layer(o)
-#         action = action.reshape(batch_size, self.H_dim, -1)
-
-#         return action
-
-
-class StateEncoder(nn.Module):
-    def __init__(self, latent_dim, obs_dim, z_dim, enc_size, hidden_dim):
-        super().__init__()
-        self.embed_obs = nn.Linear(obs_dim, enc_size)
-        self.embed_act = nn.Linear(z_dim, enc_size)
-        self.layer1 = nn.Linear(enc_size, hidden_dim)
-        self.layer2 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer3 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer4 = nn.Linear(hidden_dim, hidden_dim)
-
-        self.fc_mu = nn.Linear(hidden_dim, latent_dim)
-        self.log_std = nn.Linear(hidden_dim, latent_dim)
-        self.obs_dim = obs_dim
-        self.z_dim = z_dim
-
-    def forward(self, x):
-        e_obs = self.embed_obs(x[:, :self.obs_dim])
-        e_z = self.embed_act(x[:, self.obs_dim:self.obs_dim + self.z_dim])
-        x = e_obs + e_z
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        x = F.relu(self.layer3(x))
-        x = F.relu(self.layer4(x))
-
-        mu = self.fc_mu(x)
-        log_std = self.log_std(x)
-        std = torch.exp(torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX))
-
-        density = Normal(mu, std)
-        sample = density.rsample()
-
-        return sample, density, mu, std
-
-class StateDecoder(nn.Module):
-    def __init__(self, latent_dim, obs_dim, z_dim, hidden_dim):
-        super().__init__()
-        self.layer1 = nn.Linear(latent_dim, hidden_dim)
-        self.layer2 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer3 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer4 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer5 = nn.Linear(hidden_dim, hidden_dim)
-        
-        self.out_obs = nn.Linear(hidden_dim, obs_dim)
-        self.out_act = nn.Linear(hidden_dim, z_dim)
-
-    def forward(self, x):
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
-        x = F.relu(self.layer3(x))
-        x = F.relu(self.layer4(x))
-        x = F.relu(self.layer5(x))
-
-        out_obs = self.out_obs(x)
-        out_act = self.out_act(x)
-
-        out = torch.cat([out_obs, out_act], 1)
-
-        return out
-        
-
 class SkillPrior(nn.Module):
     def __init__(self, input_obs, net_arch=[128] * 6, latent_dim=12):
         super().__init__()
@@ -353,7 +227,7 @@ class SkillPolicy(nn.Module):
         
         density = Normal(mu, std)
         sample = density.rsample()
-        sample = self.action_range * torch.tanh(sample / self.action_range)
+        sample = torch.tanh(sample / self.action_range)
         
         return sample, density, mu, std
     

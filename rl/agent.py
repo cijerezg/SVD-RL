@@ -103,7 +103,7 @@ class VaLS(hyper_params):
                         params, optimizers = reset_params(params, keys, optimizers, self.learning_rate)
                     elif self.SVD:
                         params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.learning_rate)
-                        self.singular_val_k = 2 * self.singular_val_k
+                        self.singular_val_k = 1.5 * self.singular_val_k
                         
                     self.log_alpha_skill = torch.tensor(INIT_LOG_ALPHA, dtype=torch.float32,
                                                         requires_grad=True,

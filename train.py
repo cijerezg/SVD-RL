@@ -6,7 +6,7 @@ from utilities.optimization import set_optimizers
 from rl.agent import VaLS
 from rl.sampler import Sampler, ReplayBuffer
 from datetime import datetime
-from models.nns import Critic, SkillPolicy, StateEncoder, StateDecoder
+from models.nns import Critic, SkillPolicy
 import wandb
 import os
 import torch
@@ -36,10 +36,32 @@ wandb.login()
 # FetchPickAndPlace-v2
 # FetchPush-v2
 
-ENV_NAME = 'FrankaKitchen-v1'
+ENV_NAME = 'FetchPickAndPlace-v2'
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'
+
+if 'Ant' in ENV_NAME:
+    hyperparams_dict  = {'max_iterations': int(4e6) + 1,
+                         'buffer_size': int(4e6) + 1,
+                         'reset_frequency': 50000,
+                         'test_freq': 400000}
+
+elif 'Adroit' in ENV_NAME or 'Franka' in ENV_NAME:
+    hyperparams_dict  = {'max_iterations': int(8e5) + 1,
+                         'buffer_size': int(8e5) + 1,
+                         'reset_frequency': 12500,
+                         'test_freq': 100000}
+
+elif 'Fetch' in ENV_NAME:
+    hyperparams_dict  = {'max_iterations': int(2e5) + 1,
+                         'buffer_size': int(2e5) + 1,
+                         'reset_frequency': 6250,
+                         'test_freq': 50000}
+
+else:
+    raise ValueError('This environment is not registered in the code')
+
 
 config = {
     # General hyperparams
@@ -53,20 +75,16 @@ config = {
     'learning_rate': 3e-4,
     'discount': 0.99,
     'delta_skill': 48,
-    'gradient_steps': 1,
-    'max_iterations': int(8e5 + 1),
-    'buffer_size': int(8e5 + 1),
-    'test_freq': 100000,
-    'reset_frequency': 12500,
+    'gradient_steps': 16,
     'singular_val_k': 1,
 
     # Algo selection params
-    'SVD': False,
+    'SVD': True,
     'Replayratio': False,
     'Underparameter': False,
     'SAC': False,
 
-    'folder_sing_vals': 'SPiRL-16',
+    'folder_sing_vals': 'SVD',
     
     # Run params
     'train_rl': True,
@@ -75,14 +93,16 @@ config = {
 }
 
 
+config.update(hyperparams_dict)
+
 path_to_data = f'datasets/{ENV_NAME}.pt'
 
 
 def main(config=None):
     """Train all modules."""
     with wandb.init(project=f'SVD-{ENV_NAME}', config=config,
-                    notes='SPiRL to compare evolution of singular vals.',
-                    name='Random policy'):
+                    notes='SVD baseline.',
+                    name='SVD'):
 
         config = wandb.config
 
