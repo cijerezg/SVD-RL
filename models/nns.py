@@ -330,27 +330,22 @@ class LengthPolicy(nn.Module):
 
 
 class SkillPolicy(nn.Module):
-    def __init__(self, input_obs, action_range=4, net_arch=[128] * 3, latent_dim=12):
+    def __init__(self, input_obs, action_range=4, net_arch=[128] * 4, latent_dim=12):
         super().__init__()
         self.embed_obs = nn.Linear(input_obs, 128)
 
         latent_policy = create_mlp(128, -1, net_arch=net_arch, use_batch_norm=False)
         self.latent_policy = nn.Sequential(*latent_policy)
-        latent_policy2 = create_mlp(128, -1, net_arch=net_arch, use_batch_norm=False)
-        self.latent_policy2 = nn.Sequential(*latent_policy2)
 
         self.mu = nn.Linear(net_arch[-1], latent_dim)
         self.log_std = nn.Linear(net_arch[-1], latent_dim)
 
-        self.input_obs = input_obs
         self.action_range = action_range
 
     def forward(self, data):
-        x = self.embed_obs(data[:, 0:self.input_obs])
+        x = self.embed_obs(data)
         policy_latent = self.latent_policy(x)
-                
-        policy_latent = self.latent_policy2(policy_latent)
-        
+                        
         mu = self.mu(policy_latent)
 
         log_std = self.log_std(policy_latent)

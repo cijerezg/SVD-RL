@@ -147,17 +147,7 @@ def Adam_update(params: list[dict],
 def set_optimizers(params, keys, lr):
     optimizers = {}
     for key in keys:
-        if 'skills' in key:
-            parameters = (*params['Encoder'].values(),
-                          *params['Decoder'].values())
-        elif 'state' in key:
-            parameters = (*params['StateEncoder'].values(),
-                          *params['StateDecoder'].values())
-
-        else:
-            parameters = params[key].values()
-                
-
+        parameters = params[key].values()                
         optimizers[key] = Adam(parameters, lr=lr)
 
     return optimizers

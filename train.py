@@ -1,7 +1,7 @@
 """Train all models."""
 
 from offline.offline_train import HIVES
-from utilities.utils import params_extraction, load_pretrained_models
+from utilities.utils import params_extraction, load_pretrained_models, hyper_params
 from utilities.optimization import set_optimizers
 from rl.agent import VaLS
 from rl.sampler import Sampler, ReplayBuffer
@@ -35,7 +35,18 @@ wandb.login()
 # FrankaKitchen-v1
 
 ENV_NAME = 'AdroitHandRelocateSparse-v1'
-PARENT_FOLDER = 'checkpoints_relocate'
+
+if 'Relocate' in ENV_NAME:
+    PARENT_FOLDER = 'checkpoints/relocate'
+elif 'Pen' in ENV_NAME:
+    PARENT_FOLDER = 'checkpoints/pen'
+elif 'Ant' in ENV_NAME:
+    PARENT_FOLDER = 'checkpoints/ant'
+elif 'Egg' in ENV_NAME:
+    PARENT_FOLDER = 'checkpoints/egg'
+elif 'ManipulatePen' in ENV_NAME:
+    PARENT_FOLDER = 'checkpoints/pen_hand'
+        
 CASE_FOLDER = 'Baseline'
 
 config = {
@@ -44,29 +55,17 @@ config = {
     'hidden_dim': 128,
     'env_id': ENV_NAME,
     
-    # Offline hyperparams
-    'vae_batch_size': 1024,
-    'vae_lr': 6e-4,
-    'priors_lr': 6e-4,
-    'epochs': 501,
-    'beta': 0.01,
-    'length': 10,
-    'z_skill_dim': 12,
-
     # Online hyperparams  
     'batch_size': 256,
     'action_range': 4,
-    'critic_lr': 3e-4,
-    'actor_lr': 3e-4,
+    'learning_rate': 3e-4,
     'discount': 0.97,
-    'delta_skill': 32,
-    'delta_length': 32,
-    'z_state_dim': 8,
-    'gradient_steps': 16,
-    'max_iterations': int(80000 + 1),
-    'buffer_size': int(80000 + 1),
-    'test_freq': 40000,
-    'reset_frequency': 10000,
+    'delta_skill': 48,
+    'gradient_steps': 1,
+    'max_iterations': int(6000 + 1),
+    'buffer_size': int(6000 + 1),
+    'test_freq': 2000,
+    'reset_frequency': 20,
     'singular_val_k': 1,
 
     # Algo selection params
@@ -74,16 +73,11 @@ config = {
     'Replayratio': False,
     'Underparameter': False,
     'SAC': False,
-    'SPiRL': True,
 
     'folder_sing_vals': 'SPiRL-16',
     
     # Run params
-    'train_VAE_models': False,
-    'train_priors': False,
     'train_rl': True,
-    'load_VAE_models': True,
-    'load_prior_models': True,
     'load_rl_models': False,
     'render_results': False
 }
@@ -94,43 +88,36 @@ path_to_data = f'datasets/{ENV_NAME}.pt'
 
 def main(config=None):
     """Train all modules."""
-    with wandb.init(project='SVD-Relocate-Online', config=config,
+    with wandb.init(project=f'SVD-{ENV_NAME}', config=config,
                     notes='SPiRL to compare evolution of singular vals.',
                     name='Random policy'):
 
         config = wandb.config
 
         path = PARENT_FOLDER
-        hives = HIVES(config)
 
-        if not config.train_rl:
-            hives.dataset_loader(path_to_data)
+        action_dim, state_dim = hyper_params.env_dims(config.env_id)
 
-        skill_policy = SkillPolicy(hives.state_dim, hives.action_range,
-                                   latent_dim=hives.z_skill_dim).to(hives.device)
+        skill_policy = SkillPolicy(state_dim, config.action_range,
+                                   latent_dim=action_dim).to(config.device)
 
-        critic = Critic(hives.state_dim, hives.z_skill_dim).to(hives.device)
+        critic = Critic(state_dim, action_dim).to(config.device)
         
-        sampler = Sampler(skill_policy, hives.models['Decoder'], hives.evaluate_decoder, config)
+        sampler = Sampler(skill_policy, config)
 
-        experience_buffer = ReplayBuffer(hives.buffer_size, sampler.env,
-                                         hives.z_skill_dim, config.reset_frequency,
-                                         config)
+        experience_buffer = ReplayBuffer(sampler.env, config)
 
         vals = VaLS(sampler,
                     experience_buffer,
-                    hives,
                     skill_policy,
                     critic,
                     config)
         
-        hives_models = list(hives.models.values())
-
-        models = [*hives_models, vals.skill_policy,
+        models = [vals.skill_policy,
                   vals.critic, vals.critic,
                   vals.critic, vals.critic]
         
-        names = [*hives.names, 'SkillPolicy', 'Critic1', 'Target_critic1',
+        names = ['SkillPolicy', 'Critic1', 'Target_critic1',
                  'Critic2', 'Target_critic2']
     
         params_path = 'Prior/params_04-09-2023-02_43_11_offline.pt'
@@ -140,48 +127,10 @@ def main(config=None):
         
         params = params_extraction(models, names, pretrained_params)
 
-        if config.train_rl:
-            vals.experience_buffer.log_offline_dataset(f'datasets/{ENV_NAME}.pt',
-                                                       params, hives.evaluate_encoder, hives.device)
-        
-        test_freq = config.epochs // 4
-        test_freq = test_freq if test_freq > 0 else 1
-    
-        keys_optims = ['VAE_skills']
-        keys_optims.extend(['SkillPrior', 'SkillPolicy'])
-        keys_optims.extend(['Critic1', 'Critic2'])
-
-        optimizers = set_optimizers(params, keys_optims, config.critic_lr)
+        optimizers = set_optimizers(params, names, config.learning_rate)
 
         print('Training is starting')
     
-        if config.train_VAE_models:
-            for e in range(config.epochs):
-                params = hives.train_vae(params,
-                                         optimizers,
-                                         config.vae_lr,
-                                         config.beta)
-                if e % test_freq == 0:
-                    print(f'Epoch is {e}')
-                    dt = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
-                    if not os.path.exists(path):
-                        os.makedirs(path)
-                    torch.save(params, f'{path}/params_{dt}_epoch{e}.pt')
-                
-        if config.train_priors:
-            hives.set_skill_lookup(params)
-            for i in range(config.epochs):
-                params = hives.train_prior(params, optimizers,
-                                           config.priors_lr)
-
-            folder = 'Prior'
-            dt_string = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
-            fullpath = f'{path}/{folder}'
-            if not os.path.exists(fullpath):
-                os.makedirs(fullpath)
-                
-            torch.save(params, f'{path}/{folder}/params_{dt_string}_offline.pt')
-
         if config.train_rl:
             params = vals.training(params, optimizers, path, CASE_FOLDER)
 

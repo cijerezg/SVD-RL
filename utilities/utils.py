@@ -23,16 +23,21 @@ class hyper_params:
             setattr(self, key, value)
         
         self.device = torch.device(args.device)
-        self.action_dim, self.state_dim = self.env_dims(args.env_id)
-        if 'Adroit' in self.env_id:
-            self.env_key = 'adroit'
-        elif 'Kitchen' in self.env_id:
-            self.env_key = 'kitchen'
+        self.action_dim, self.state_dim = hyper_params.env_dims(args.env_id)
+        if 'Relocate' in self.env_id:
+            self.env_key = 'relocate'
+        elif 'Pen' in self.env_id:
+            self.env_key = 'pen'
         elif 'Ant' in self.env_id:
             self.env_key = 'ant'
+        elif 'Egg' in self.env_id:
+            self.env_key = 'egg'
+        elif 'ManipulatePen':
+            self.env_key = 'pen_hand'
         # Assign env_key for all other environments.
 
-    def env_dims(self, env_id):
+    @staticmethod
+    def env_dims(env_id):
         """Get action and observation dimensions."""
         env = gym.make(env_id)
         if 'Ant' in env_id:
@@ -110,21 +115,6 @@ def load_pretrained_models(args, folder, filename):
         params = torch.load(path)
     else:
         return pretrained_params
-
-    if args.load_VAE_models:
-        for key in params:
-            if key == 'Encoder' or key == 'Decoder':
-                pretrained_params.append(params[key])
-            # if 'coder' in key:
-            #     number = int(''.join(filter(str.isdigit, key)))
-            #     if number in lengths:
-            #         pdb.set_trace()
-            #         pretrained_params.append(params[key])
-        print('VAE params have been loaded.')
-
-    if args.load_prior_models:
-        pretrained_params.append(params['SkillPrior'])
-        print('Prior models have been loaded.')
 
     if args.load_rl_models:
         print('RL models were loaded.')

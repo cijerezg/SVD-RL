@@ -37,7 +37,6 @@ class VaLS(hyper_params):
     def __init__(self,
                  sampler,
                  experience_buffer,
-                 vae,
                  skill_policy,
                  critic,
                  args):
@@ -47,20 +46,18 @@ class VaLS(hyper_params):
         self.sampler = sampler
         self.critic = critic
         self.skill_policy = skill_policy
-        self.vae = vae
         self.experience_buffer = experience_buffer
         
         self.log_alpha_skill = torch.tensor(INIT_LOG_ALPHA, dtype=torch.float32,
                                             requires_grad=True,
                                             device=self.device)
-        self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=args.actor_lr)
+        self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=args.learning_rate)
 
         self.reward_per_episode = 0
         self.total_episode_counter = 0
-        self.reward_logger = [0]
+        self.reward_logger = []
         self.log_data = 0
-        self.log_data_freq = 500
-        self.email = True
+        self.log_data_freq = 2000
         
     def training(self, params, optimizers, path, name):
         self.iterations = 0
@@ -73,7 +70,7 @@ class VaLS(hyper_params):
 
             params, obs, done = self.training_iteration(params, done,
                                                         optimizers,
-                                                        self.actor_lr,
+                                                        self.learning_rate,
                                                         ref_params,
                                                         obs=obs)
 
@@ -103,15 +100,15 @@ class VaLS(hyper_params):
                     ref_params = copy.deepcopy(params)
                     
                     if self.Replayratio:
-                        params, optimizers = reset_params(params, keys, optimizers, self.actor_lr)
+                        params, optimizers = reset_params(params, keys, optimizers, self.learning_rate)
                     elif self.SVD:
-                        params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.actor_lr)
+                        params, optimizers = self.rescale_singular_vals(params, keys, optimizers, self.learning_rate)
                         self.singular_val_k = 2 * self.singular_val_k
                         
                     self.log_alpha_skill = torch.tensor(INIT_LOG_ALPHA, dtype=torch.float32,
                                                         requires_grad=True,
                                                         device=self.device)
-                    self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=self.actor_lr)
+                    self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=self.learning_rate)
                     
                     self.experience_buffer.idx_tracker[:] = 0
                 
@@ -134,7 +131,7 @@ class VaLS(hyper_params):
         self.experience_buffer.add(obs, next_obs, z, next_z, rew, done)
 
         if done:
-            if self.total_episode_counter > 2:
+            if self.total_episode_counter > 1:
                 self.experience_buffer.update_tracking_buffers(self.reward_per_episode)
             wandb.log({'Reward per episode': self.reward_per_episode,
                        'Total episodes': self.total_episode_counter})
@@ -151,14 +148,14 @@ class VaLS(hyper_params):
 
         self.log_data = (self.log_data + 1) % self.log_data_freq
 
-        if self.experience_buffer.size > self.batch_size + 243: # The 243 is so that the batch size matches the log_data
+        if self.experience_buffer.size > self.log_data_freq - 1:
             
             for i in range(self.gradient_steps):
                 log_data = log_data if i == 0 else False # Only log data once for multi grad steps.
                 policy_losses, critic1_loss, critic2_loss = self.losses(params, log_data, ref_params)
                 losses = [*policy_losses, critic1_loss, critic2_loss]
                 names = ['SkillPolicy', 'Critic1', 'Critic2']
-                #params = Adam_update(params, losses, names, optimizers, lr)
+                params = Adam_update(params, losses, names, optimizers, lr)
                 polyak_update(params['Critic1'].values(),
                               params['Target_critic1'].values(), 0.005)
                 polyak_update(params['Critic2'].values(),
@@ -175,12 +172,7 @@ class VaLS(hyper_params):
         return params, next_obs, done
 
     def losses(self, params, log_data, ref_params):
-        if self.SVD:
-            s_ratio = np.exp(- 4 * self.iterations / self.max_iterations - .7)
-        elif self.Replayratio or self.SAC or self.SPiRL or self.Underpameter:
-            s_ratio = 0.0
-
-        batch = self.experience_buffer.sample(batch_size=self.batch_size, s_ratio=s_ratio)       
+        batch = self.experience_buffer.sample(batch_size=self.batch_size)
 
         obs = torch.from_numpy(batch.observations).to(self.device)
         next_obs = torch.from_numpy(batch.next_observations).to(self.device)
@@ -190,12 +182,12 @@ class VaLS(hyper_params):
         dones = torch.from_numpy(batch.dones).to(self.device)
         cum_reward = torch.from_numpy(batch.cum_reward).to(self.device)
         norm_cum_reward = torch.from_numpy(batch.norm_cum_reward).to(self.device)
-        idxs = torch.from_numpy(batch.idxs).to(self.device)
+
         
         if log_data:
             singular_vals = self.compute_singular_vals(params)
             if self.folder_sing_vals is not None:
-                path = f'results/relocate/{self.folder_sing_vals}3'
+                path = f'results/{self.env_key}/{self.folder_sing_vals}'
                 if not os.path.exists(path):
                     os.makedirs(path)
                 np.save(f'{path}/{self.iterations}.npy', singular_vals, allow_pickle=True)
@@ -236,27 +228,15 @@ class VaLS(hyper_params):
             wandb.log({'Critic/Mean diff dist rand': wandb.Histogram(mean_diff_rand.cpu()),
                        'Critic/Mean diff average rand': mean_diff_rand.mean().cpu(),
                        'Policy/Eval policy critic_random': eval_test_ave,
-                       'Critic/Offline ratio': s_ratio,
                        'Gradient updates': self.gradient_steps,
                        })
 
-            bins = np.linspace(0, 200000, num=81)
-            vals = []
-            for i in range(bins.shape[0] - 1):
-                aux = self.experience_buffer.idx_tracker[i * 2500: 2500*(i + 1)].sum()
-                vals.append(aux)
-
-            vals = np.array(vals)
-            hist = (vals, bins)
-            wandb.log({'Logged idx': wandb.Histogram(np_histogram=hist)})
                                                                  
         ####
         target_critic_arg = torch.cat([next_obs, next_z], dim=1)
         critic_arg = torch.cat([obs, z], dim=1)
         
         with torch.no_grad():                                
-            z_prior = self.eval_skill_prior(obs, params)
-
             q_target1, q_target2 = self.eval_critic(target_critic_arg, params,
                                                     target_critic=True)
             
@@ -275,21 +255,9 @@ class VaLS(hyper_params):
 
             bellman_terms = self.log_scatter_3d(q1, q_target.unsqueeze(dim=1), rew, cum_reward,
                                                 'Q val', 'Q target', 'Reward', 'Cum reward')
-            bellman_terms_ref = self.log_scatter_3d(q1, q_refs, cum_reward, idxs.unsqueeze(dim=1),
-                                                    'Q val', 'Q refs', 'Cum reward', 'Idxs')
             
-            with torch.no_grad():
-                diff_Q = q1 - q_refs
-                diff_Qt = q_target.reshape(-1, 1) - q_refs_target
-
-            diff_Qs = self.log_scatter_3d(diff_Q, diff_Qt, cum_reward, idxs.unsqueeze(dim=1),
-                                          'Diff Qs', 'Diff Q targets', 'Cum rewards', 'Idxs')
-
-
             wandb.log({'Critic/Distance critic to target 1': dist1,
-                       'Critic/Bellman terms': bellman_terms,
-                       'Critic/Bellman ref terms': bellman_terms_ref,
-                       'Critic/Diff Qs refs': diff_Qs})
+                       'Critic/Bellman terms': bellman_terms})
 
         q_target = rew + (0.97 * q_target).reshape(-1, 1) * (1 - dones)
         q_target = torch.clamp(q_target, min=-100, max=100)
@@ -323,10 +291,9 @@ class VaLS(hyper_params):
         q_pi = torch.cat((q_pi1, q_pi2), dim=1)
         q_pi, _ = torch.min(q_pi, dim=1)
         
-        if self.SAC or self.Replayratio or self.Underparameter:
-            skill_prior = torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
-        elif self.SPiRL or self.SVD:
-            skill_prior = torch.clamp(kl_divergence(pdf, z_prior), max=MAX_SKILL_KL).mean()
+
+        skill_prior = torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
+
         
         alpha_skill = torch.exp(self.log_alpha_skill).detach()
         skill_prior_loss = alpha_skill * skill_prior
@@ -350,7 +317,6 @@ class VaLS(hyper_params):
                 z_ref, _, mu_ref, _ = self.eval_skill_policy(obs, ref_params)
                 q_pi_ref_arg = torch.cat([obs, z_ref], dim=1)
                 q_pi_ref, _ = self.eval_critic(q_pi_ref_arg, params)
-                mu_diff = F.l1_loss(mu, mu_ref, reduction='none').mean(1)
                 diff = q_pi.reshape(-1, 1) - q1
                 mu_diff_as = F.l1_loss(mu, z, reduction='none').mean(1)
 
@@ -360,8 +326,6 @@ class VaLS(hyper_params):
             pi_reward = self.log_scatter_3d(q_pi.reshape(-1, 1), rew, mu_diff_as.unsqueeze(dim=1), cum_reward,
                                             'Q pi', 'Reward', 'Diff mu pi and z', 'Cum reward')
 
-            pi_terms = self.log_scatter_3d(q1, q_refs, mu_diff.unsqueeze(dim=1), idxs.unsqueeze(dim=1),
-                                           'Q val', 'Q refs', 'Mu diff', 'Idxs')
                 
             wandb.log(
                 {'Policy/current_q_values': wandb.Histogram(q_pi.detach().cpu()),
@@ -371,7 +335,6 @@ class VaLS(hyper_params):
                  'Policy/Z distribution': wandb.Histogram(z_sample.detach().cpu()),
                  'Policy/Mean STD': std.mean().detach().cpu(),
                  'Policy/Mu dist': wandb.Histogram(mu.detach().cpu()),
-                 'Policy/pi terms': pi_terms,
                  'Policy/Pi diff data': pi_diff,
                  'Policy/Pi reward': pi_reward,
                  })
@@ -423,32 +386,6 @@ class VaLS(hyper_params):
         q2 = functional_call(self.critic, params[name2], arg)
 
         return q1, q2
-
-    def computation_state_vae(self, critic_arg, params):
-        names = ['StateEncoder', 'StateDecoder']
-        z, pdf, mu, std, rec = self.eval_state_vae(critic_arg, params, names)
-        rec_loss = -Normal(rec, 1).log_prob(critic_arg).sum(axis=-1)
-        N = Normal(0, 1)
-        kl_loss = torch.mean(kl_divergence(pdf, N))
-        loss = rec_loss.mean() + 0.01 * kl_loss
-
-        with torch.no_grad():
-            names2 = ['TargetEncoder', 'TargetDecoder']
-            _, _, _, _, rec_target = self.eval_state_vae(critic_arg, params, names2)
-            weights = F.mse_loss(critic_arg, rec_target, reduction='none')
-            weights = weights.mean(1)
-            
-        return loss, weights
-
-    def eval_state_vae(self, critic_arg, params, names):
-        z, pdf, mu, std = functional_call(self.state_encoder,
-                                          params[names[0]],
-                                          critic_arg)
-
-        rec = functional_call(self.state_decoder,
-                              params[names[1]], z)
-
-        return z, pdf, mu, std, rec
 
     def log_histogram_2d(self, x, y, xlabel, ylabel):
         x = x.detach().cpu().numpy()
