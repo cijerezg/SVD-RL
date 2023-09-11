@@ -34,8 +34,8 @@ wandb.login()
 # AntMaze_Medium-v3
 # FrankaKitchen-v1
 
-ENV_NAME = 'AntMaze_Medium-v3'
-PARENT_FOLDER = 'checkpoints_ant'
+ENV_NAME = 'AdroitHandRelocateSparse-v1'
+PARENT_FOLDER = 'checkpoints_relocate'
 CASE_FOLDER = 'Baseline'
 
 config = {
@@ -70,20 +70,20 @@ config = {
     'singular_val_k': 1,
 
     # Algo selection params
-    'SVD': True,
+    'SVD': False,
     'Replayratio': False,
     'Underparameter': False,
     'SAC': False,
-    'SPiRL': False,
+    'SPiRL': True,
 
-    'save_data': False,
+    'folder_sing_vals': 'SPiRL-16',
     
     # Run params
     'train_VAE_models': False,
     'train_priors': False,
     'train_rl': True,
-    'load_VAE_models': False,
-    'load_prior_models': False,
+    'load_VAE_models': True,
+    'load_prior_models': True,
     'load_rl_models': False,
     'render_results': False
 }
@@ -95,8 +95,8 @@ path_to_data = f'datasets/{ENV_NAME}.pt'
 def main(config=None):
     """Train all modules."""
     with wandb.init(project='SVD-Relocate-Online', config=config,
-                    notes='SVD RL training cloned data. With weights method',
-                    name='Test data'):
+                    notes='SPiRL to compare evolution of singular vals.',
+                    name='Random policy'):
 
         config = wandb.config
 

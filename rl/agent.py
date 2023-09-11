@@ -151,14 +151,14 @@ class VaLS(hyper_params):
 
         self.log_data = (self.log_data + 1) % self.log_data_freq
 
-        if self.experience_buffer.size > self.batch_size:
+        if self.experience_buffer.size > self.batch_size + 243: # The 243 is so that the batch size matches the log_data
             
             for i in range(self.gradient_steps):
                 log_data = log_data if i == 0 else False # Only log data once for multi grad steps.
                 policy_losses, critic1_loss, critic2_loss = self.losses(params, log_data, ref_params)
                 losses = [*policy_losses, critic1_loss, critic2_loss]
                 names = ['SkillPolicy', 'Critic1', 'Critic2']
-                params = Adam_update(params, losses, names, optimizers, lr)
+                #params = Adam_update(params, losses, names, optimizers, lr)
                 polyak_update(params['Critic1'].values(),
                               params['Target_critic1'].values(), 0.005)
                 polyak_update(params['Critic2'].values(),
@@ -194,9 +194,11 @@ class VaLS(hyper_params):
         
         if log_data:
             singular_vals = self.compute_singular_vals(params)
-            if self.save_data:
-                np.save(f'results/relocate/singular_vals{self.iterations}.npy',
-                        singular_vals, allow_pickle=True)
+            if self.folder_sing_vals is not None:
+                path = f'results/relocate/{self.folder_sing_vals}3'
+                if not os.path.exists(path):
+                    os.makedirs(path)
+                np.save(f'{path}/{self.iterations}.npy', singular_vals, allow_pickle=True)
 
             for log_name, log_val in singular_vals.items():
                 wandb.log({log_name: wandb.Histogram(log_val)})
