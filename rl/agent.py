@@ -187,7 +187,8 @@ class VaLS(hyper_params):
         if log_data:
             singular_vals = self.compute_singular_vals(params)
             if self.folder_sing_vals is not None:
-                path = f'results/{self.env_key}/{self.folder_sing_vals}'
+                dt_string = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
+                path = f'results/{self.env_key}/{self.folder_sing_vals}/{dt_string}'
                 if not os.path.exists(path):
                     os.makedirs(path)
                 np.save(f'{path}/{self.iterations}.npy', singular_vals, allow_pickle=True)
