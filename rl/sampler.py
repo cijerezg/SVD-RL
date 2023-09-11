@@ -37,6 +37,8 @@ class Sampler(hyper_params):
             action = action.cpu().numpy()
         
         obs, reward, terminated, truncated, info = self.env.step(action)
+        if isinstance(obs, dict):
+            obs = self.convert_obs_dict_to_array(obs)
 
         done = True if terminated or truncated else False
 
@@ -57,9 +59,21 @@ class Sampler(hyper_params):
     def skill_iteration(self, params, done=False, obs=None):
         if done or obs is None:
             obs, _ = self.env.reset()
+            if isinstance(obs, dict):
+                obs = self.convert_obs_dict_to_array(obs)           
 
         return obs, self.skill_step(params, obs)
-    
+
+    def convert_obs_dict_to_array(self, obs):
+        if 'Franka' in self.env_key:
+            observation = obs['observation']
+            achieved = np.hstack(list(obs['achieved_goal'].values()))
+            desired = np.hstack(list(obs['desired_goal'].values()))
+            obs = np.concatenate((observation, achieved, desired), axis=0)
+            return obs
+        else:
+            return np.hstack(list(obs.values()))
+
        
 class ReplayBuffer(hyper_params):
     def __init__(self, env, args):

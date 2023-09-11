@@ -109,9 +109,7 @@ class VaLS(hyper_params):
                                                         requires_grad=True,
                                                         device=self.device)
                     self.optimizer_alpha_skill = Adam([self.log_alpha_skill], lr=self.learning_rate)
-                    
-                    self.experience_buffer.idx_tracker[:] = 0
-                
+                                    
         return params
 
     def training_iteration(self,

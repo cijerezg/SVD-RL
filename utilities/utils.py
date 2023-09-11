@@ -24,28 +24,35 @@ class hyper_params:
         
         self.device = torch.device(args.device)
         self.action_dim, self.state_dim = hyper_params.env_dims(args.env_id)
-        if 'Relocate' in self.env_id:
-            self.env_key = 'relocate'
-        elif 'Pen' in self.env_id:
-            self.env_key = 'pen'
-        elif 'Ant' in self.env_id:
-            self.env_key = 'ant'
-        elif 'Egg' in self.env_id:
-            self.env_key = 'egg'
-        elif 'ManipulatePen':
-            self.env_key = 'pen_hand'
-        # Assign env_key for all other environments.
+        self.env_key = self.env_id
 
     @staticmethod
     def env_dims(env_id):
         """Get action and observation dimensions."""
         env = gym.make(env_id)
-        if 'Ant' in env_id:
-            action_dim = env.action_space.sample().shape[0]
-            state_dim = env.observation_space.sample()['observation'].shape[0]
+
+        if isinstance(env.observation_space.sample(), dict):
+            if 'Franka' in env_id:
+                state = env.observation_space.sample()
+
+                achieved, desired = 0, 0
+                for goal in state['achieved_goal']:
+                    achieved += state['achieved_goal'][goal].shape[0]
+                for goal in state['desired_goal']:
+                    desired += state['desired_goal'][goal].shape[0]
+
+                obs_dim = state['observation'].shape[0]
+                state_dim = achieved + desired + obs_dim
+            else:
+                achieved_goal_dim = env.observation_space.sample()['achieved_goal'].shape[0]
+                goal_dim = env.observation_space.sample()['desired_goal'].shape[0]
+                obs_dim = env.observation_space.sample()['observation'].shape[0]
+                state_dim = achieved_goal_dim + goal_dim + obs_dim
         else:
-            action_dim = env.action_space.shape[0]
             state_dim = env.observation_space.shape[0]
+
+        action_dim = env.action_space.shape[0]
+
         env.close()
         del env
         return action_dim, state_dim

@@ -33,20 +33,12 @@ wandb.login()
 # AdroitHandPenSparse-v1
 # AntMaze_Medium-v3
 # FrankaKitchen-v1
+# FetchPickAndPlace-v2
+# FetchPush-v2
 
-ENV_NAME = 'AdroitHandRelocateSparse-v1'
+ENV_NAME = 'FetchPickAndPlace-v2'
 
-if 'Relocate' in ENV_NAME:
-    PARENT_FOLDER = 'checkpoints/relocate'
-elif 'Pen' in ENV_NAME:
-    PARENT_FOLDER = 'checkpoints/pen'
-elif 'Ant' in ENV_NAME:
-    PARENT_FOLDER = 'checkpoints/ant'
-elif 'Egg' in ENV_NAME:
-    PARENT_FOLDER = 'checkpoints/egg'
-elif 'ManipulatePen' in ENV_NAME:
-    PARENT_FOLDER = 'checkpoints/pen_hand'
-        
+PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'
 
 config = {
@@ -59,13 +51,13 @@ config = {
     'batch_size': 256,
     'action_range': 4,
     'learning_rate': 3e-4,
-    'discount': 0.97,
+    'discount': 0.99,
     'delta_skill': 48,
     'gradient_steps': 1,
-    'max_iterations': int(6000 + 1),
-    'buffer_size': int(6000 + 1),
-    'test_freq': 2000,
-    'reset_frequency': 20,
+    'max_iterations': int(8e5 + 1),
+    'buffer_size': int(8e5 + 1),
+    'test_freq': 100000,
+    'reset_frequency': 12500,
     'singular_val_k': 1,
 
     # Algo selection params
