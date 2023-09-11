@@ -125,7 +125,6 @@ class VaLS(hyper_params):
         next_obs, rew, z, next_z, done = data
 
         self.reward_per_episode += rew
-        print(f'Ep reward {self.reward_per_episode}')
 
         self.experience_buffer.add(obs, next_obs, z, next_z, rew, done)
 
