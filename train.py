@@ -1,4 +1,4 @@
-"""Train all models."""
+"""Train all models. This is the offline version of the code"""
 
 from offline.offline_train import HIVES
 from utilities.utils import params_extraction, load_pretrained_models
