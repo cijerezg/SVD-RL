@@ -36,6 +36,13 @@ wandb.login()
 # FetchPickAndPlace-v2
 # FetchPush-v2
 
+ANT = 'AntMaze_MediumDense-v3'
+PICK = 'FetchPickAndPlaceDense-v2'
+PUSH = 'FetchPushDense-v2'
+KITCHEN = 'FrankaKitchen-v1'
+RELOCATE = 'AdroitHandRelocateSparse-v1'
+PEN = 'AdroitHandPenSparse-v1'
+
 ENV_NAME = 'FrankaKitchen-v1'
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
@@ -73,7 +80,7 @@ config = {
     'batch_size': 256,
     'learning_rate': 3e-4,
     'discount': 0.99,
-    'delta_skill': 48,
+    'delta_skill': 8,
     'gradient_steps': 16,
     'singular_val_k': 1,
 
