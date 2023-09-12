@@ -116,8 +116,7 @@ def main(config=None):
 
         action_dim, state_dim = hyper_params.env_dims(config.env_id)
 
-        skill_policy = SkillPolicy(state_dim, config.action_range,
-                                   latent_dim=action_dim).to(config.device)
+        skill_policy = SkillPolicy(state_dim, action_dim).to(config.device)
 
         critic = Critic(state_dim, action_dim).to(config.device)
         

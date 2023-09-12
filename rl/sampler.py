@@ -23,7 +23,7 @@ class Sampler(hyper_params):
         super().__init__(args)
 
         self.skill_policy = skill_policy
-        self.env = gym.make(self.env_id, render_mode='human')
+        self.env = gym.make(self.env_id)
 
 
     def skill_step(self, params, obs):
