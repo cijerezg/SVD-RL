@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical, Normal
 
-LOG_STD_MAX = 1.5
+LOG_STD_MAX = 0
 LOG_STD_MIN = -20
 
         
@@ -221,13 +221,13 @@ class SkillPolicy(nn.Module):
         policy_latent = self.latent_policy(x)
                         
         mu = self.mu(policy_latent)
+        mu = torch.tanh(mu)
 
         log_std = self.log_std(policy_latent)
         std = torch.exp(torch.clamp(log_std, LOG_STD_MIN, LOG_STD_MAX))
         
         density = Normal(mu, std)
         sample = density.rsample()
-        sample = torch.tanh(sample / self.action_range)
         
         return sample, density, mu, std
     

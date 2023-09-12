@@ -23,16 +23,16 @@ class Sampler(hyper_params):
         super().__init__(args)
 
         self.skill_policy = skill_policy
-        self.env = gym.make(self.env_id)
+        self.env = gym.make(self.env_id, render_mode='human')
 
 
     def skill_step(self, params, obs):
         obs_t = torch.from_numpy(obs).to(self.device).to(torch.float32)
 
         with torch.no_grad():
-            action, _, _, _ = functional_call(self.skill_policy,
-                                              params['SkillPolicy'],
-                                              obs_t)
+            action, _, mu, std = functional_call(self.skill_policy,
+                                                  params['SkillPolicy'],
+                                                  obs_t)
 
             action = action.cpu().numpy()
 

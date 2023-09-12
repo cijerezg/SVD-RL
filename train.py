@@ -36,7 +36,7 @@ wandb.login()
 # FetchPickAndPlace-v2
 # FetchPush-v2
 
-ENV_NAME = 'FetchPickAndPlace-v2'
+ENV_NAME = 'FrankaKitchen-v1'
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'
@@ -71,7 +71,6 @@ config = {
     
     # Online hyperparams  
     'batch_size': 256,
-    'action_range': 4,
     'learning_rate': 3e-4,
     'discount': 0.99,
     'delta_skill': 48,
