@@ -31,12 +31,12 @@ wandb.login()
 # FetchPickAndPlace-v2
 # FetchPush-v2
 
-ANT = 'AntMaze_Medium-v3'
+ANT = 'AntMaze_MediumDense-v3'
 KITCHEN = 'FrankaKitchen-v1'
 RELOCATE = 'AdroitHandRelocateSparse-v1'
 PEN = 'AdroitHandPenSparse-v1'
 
-ENV_NAME = RELOCATE
+ENV_NAME = ANT
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'
@@ -51,12 +51,14 @@ elif 'Adroit' in ENV_NAME or 'Franka' in ENV_NAME:
     hyperparams_dict  = {'max_iterations': int(4e5) + 1,
                          'buffer_size': int(4e5) + 1,
                          'reset_frequency': 25000,
+                         'reward_type': 'max',
                          'test_freq': 100000}
 
 elif 'Franka' in ENV_NAME:
     hyperparams_dict  = {'max_iterations': int(8e5) + 1,
                          'buffer_size': int(8e5) + 1,
                          'reset_frequency': 25000,
+                         'reward_type': 'additive',
                          'test_freq': 100000}
     
 
@@ -64,6 +66,7 @@ elif 'Fetch' in ENV_NAME:
     hyperparams_dict  = {'max_iterations': int(2e5) + 1,
                          'buffer_size': int(2e5) + 1,
                          'reset_frequency': 6250,
+                         'reward_type': 'max',
                          'test_freq': 50000}
 
 else:
@@ -81,7 +84,7 @@ config = {
     'learning_rate': 3e-4,
     'discount': 0.99,
     'delta_skill': 8,
-    'gradient_steps': 8,
+    'gradient_steps': 4,
     'singular_val_k': 1,
 
     # Algo selection params

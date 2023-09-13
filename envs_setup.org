@@ -1,0 +1,4 @@
+* Ant environment
+** File is in maze.py and function is compute reward.
+* Kitchen environment
+** File is in kitchen_env.py

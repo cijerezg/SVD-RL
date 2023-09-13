@@ -94,7 +94,7 @@ class VaLS(hyper_params):
                 if self.iterations % self.reset_frequency == 0:
                     if self.SVD:
                         self.reset_frequency = 2 * self.reset_frequency
-                    self.gradient_steps = math.ceil(self.gradient_steps / 2)
+                    # self.gradient_steps = math.ceil(self.gradient_steps / 2) # To evaluate
                     self.interval_iteration = 0
                     keys = ['SkillPolicy', 'Critic1', 'Critic2']
                     ref_params = copy.deepcopy(params)
@@ -146,7 +146,7 @@ class VaLS(hyper_params):
 
         self.log_data = (self.log_data + 1) % self.log_data_freq
 
-        if self.experience_buffer.size > self.log_data_freq - 1:
+        if self.experience_buffer.size > self.log_data_freq - 1 + 10000000000000000000:
             
             for i in range(self.gradient_steps):
                 log_data = log_data if i == 0 else False # Only log data once for multi grad steps.

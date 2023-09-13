@@ -23,7 +23,11 @@ class Sampler(hyper_params):
         super().__init__(args)
 
         self.skill_policy = skill_policy
-        self.env = gym.make(self.env_id)
+        if 'Franka' in self.env_id:
+            self.env = gym.make(self.env_id,
+                                remove_task_when_completed=False)
+        else:
+            self.env = gym.make(self.env_id)
 
 
     def skill_step(self, params, obs):
