@@ -58,6 +58,7 @@ class VaLS(hyper_params):
         self.reward_logger = []
         self.log_data = 0
         self.log_data_freq = 2000
+        self.prior = Normal(0, 1)
         
     def training(self, params, optimizers, path, name):
         self.iterations = 0
@@ -146,7 +147,7 @@ class VaLS(hyper_params):
 
         self.log_data = (self.log_data + 1) % self.log_data_freq
 
-        if self.experience_buffer.size > self.log_data_freq - 1 + 10000000000000000000:
+        if self.experience_buffer.size > self.log_data_freq - 1:
             
             for i in range(self.gradient_steps):
                 log_data = log_data if i == 0 else False # Only log data once for multi grad steps.
@@ -271,7 +272,7 @@ class VaLS(hyper_params):
                 weights = F.sigmoid(norm_cum_reward).squeeze()
         else:
             weights = torch.ones_like(critic1_loss)
-
+            
         critic1_loss = critic1_loss * weights
         critic2_loss = critic2_loss * weights
                 
@@ -290,7 +291,8 @@ class VaLS(hyper_params):
         q_pi = torch.cat((q_pi1, q_pi2), dim=1)
         q_pi, _ = torch.min(q_pi, dim=1)
         
-        skill_prior = -torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
+        #skill_prior = -torch.clamp(pdf.entropy(), max=MAX_SKILL_KL).mean()
+        skill_prior = torch.clamp(kl_divergence(pdf, self.prior), max=MAX_SKILL_KL).mean()
 
         alpha_skill = torch.exp(self.log_alpha_skill).detach()
         skill_prior_loss = alpha_skill * skill_prior
@@ -343,8 +345,6 @@ class VaLS(hyper_params):
             wandb.log(
                 {'Critic/Critic loss': critic1_loss,
                  'Critic/Q values': wandb.Histogram(q1.detach().cpu())})
-
-            wandb.log({'Reward Percentage': sum(rew > 0.0) / self.batch_size})
         
         return policy_losses, critic1_loss, critic2_loss
 

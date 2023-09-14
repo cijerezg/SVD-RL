@@ -80,8 +80,8 @@ config = {
     'batch_size': 256,
     'learning_rate': 3e-4,
     'discount': 0.99,
-    'delta_skill': 8,
-    'gradient_steps': 8,
+    'delta_skill': 16,
+    'gradient_steps': 4,
     'singular_val_k': 1,
 
     # Algo selection params
