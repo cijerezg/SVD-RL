@@ -54,8 +54,8 @@ elif 'Adroit' in ENV_NAME or 'Franka' in ENV_NAME:
                          'test_freq': 100000}
 
 elif 'Franka' in ENV_NAME:
-    hyperparams_dict  = {'max_iterations': int(8e5) + 1,
-                         'buffer_size': int(8e5) + 1,
+    hyperparams_dict  = {'max_iterations': int(4e5) + 1,
+                         'buffer_size': int(4e5) + 1,
                          'reset_frequency': 25000,
                          'test_freq': 100000}
     
@@ -80,7 +80,7 @@ config = {
     'batch_size': 256,
     'learning_rate': 3e-4,
     'discount': 0.99,
-    'delta_skill': 16,
+    'delta_skill': 8,
     'gradient_steps': 4,
     'singular_val_k': 1,
 
