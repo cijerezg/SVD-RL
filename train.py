@@ -33,10 +33,10 @@ wandb.login()
 
 ANT = 'AntMaze_Medium-v3'
 KITCHEN = 'FrankaKitchen-v1'
-RELOCATE = 'AdroitHandRelocateSparse-v1'
+RELOCATE = 'AdroitHandRelocate-v1'
 PEN = 'AdroitHandPenSparse-v1'
 
-ENV_NAME = RELOCATE
+ENV_NAME = KITCHEN
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'
@@ -47,25 +47,25 @@ if 'Ant' in ENV_NAME:
                          'reset_frequency': 50000,
                          'test_freq': 400000}
 
-elif 'Adroit' in ENV_NAME or 'Franka' in ENV_NAME:
+elif 'Relocate' in ENV_NAME:
     hyperparams_dict  = {'max_iterations': int(4e5) + 1,
                          'buffer_size': int(4e5) + 1,
                          'reset_frequency': 25000,
                          'test_freq': 100000}
 
+elif 'Pen' in ENV_NAME:
+    hyperparams_dict  = {'max_iterations': int(4e5) + 1,
+                         'buffer_size': int(4e5) + 1,
+                         'reset_frequency': 25000,
+                         'test_freq': 100000}
+
+    
 elif 'Franka' in ENV_NAME:
     hyperparams_dict  = {'max_iterations': int(4e5) + 1,
                          'buffer_size': int(4e5) + 1,
                          'reset_frequency': 25000,
                          'test_freq': 100000}
     
-
-elif 'Fetch' in ENV_NAME:
-    hyperparams_dict  = {'max_iterations': int(2e5) + 1,
-                         'buffer_size': int(2e5) + 1,
-                         'reset_frequency': 6250,
-                         'test_freq': 50000}
-
 else:
     raise ValueError('This environment is not registered in the code')
 
@@ -80,7 +80,7 @@ config = {
     'batch_size': 256,
     'learning_rate': 3e-4,
     'discount': 0.99,
-    'delta_skill': 8,
+    'delta_skill': 4,
     'gradient_steps': 4,
     'singular_val_k': 1,
 

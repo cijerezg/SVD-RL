@@ -141,7 +141,7 @@ class VaLS(hyper_params):
 
         log_data = True if self.log_data % self.log_data_freq == 0 else False
 
-        if len(self.reward_logger) > 25 and log_data:
+        if len(self.reward_logger) > 8 and log_data:
             wandb.log({'Cumulative reward dist': wandb.Histogram(np.array(self.reward_logger))})
             wandb.log({'Average reward over 100 eps': np.mean(self.reward_logger[-100:])}, step=self.iterations)
 
@@ -181,16 +181,15 @@ class VaLS(hyper_params):
         dones = torch.from_numpy(batch.dones).to(self.device)
         cum_reward = torch.from_numpy(batch.cum_reward).to(self.device)
         norm_cum_reward = torch.from_numpy(batch.norm_cum_reward).to(self.device)
-
         
         if log_data:
             singular_vals = self.compute_singular_vals(params)
             if self.folder_sing_vals is not None:
                 dt_string = datetime.now().strftime("%d-%m-%Y-%H:%M:%S")
-                path = f'results/{self.env_key}/{self.folder_sing_vals}/{dt_string}'
+                path = f'results/{self.env_key}/{self.folder_sing_vals}/{self.iterations}'
                 if not os.path.exists(path):
                     os.makedirs(path)
-                np.save(f'{path}/{self.iterations}.npy', singular_vals, allow_pickle=True)
+                np.save(f'{path}/{dt_string}.npy', singular_vals, allow_pickle=True)
 
             for log_name, log_val in singular_vals.items():
                 wandb.log({log_name: wandb.Histogram(log_val)})
@@ -229,6 +228,7 @@ class VaLS(hyper_params):
                        'Critic/Mean diff average rand': mean_diff_rand.mean().cpu(),
                        'Policy/Eval policy critic_random': eval_test_ave,
                        'Gradient updates': self.gradient_steps,
+                       'Rewards batch': wandb.Histogram(rew.cpu())
                        })
 
                                                                  
