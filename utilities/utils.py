@@ -2,7 +2,9 @@
 
 import torch
 import torch.nn as nn
-import gymnasium as gym
+#import gymnasium as gym
+import gym
+import d4rl
 from collections import OrderedDict
 import numpy as np
 import os

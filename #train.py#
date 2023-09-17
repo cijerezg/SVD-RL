@@ -33,10 +33,10 @@ wandb.login()
 
 ANT = 'AntMaze_MediumDense-v3'
 KITCHEN = 'FrankaKitchen-v1'
-RELOCATE = 'AdroitHandRelocate-v1'
+RELOCATE = 'AdroitHandRelocate-v1 '
 PEN = 'AdroitHandPenSparse-v1'
 
-ENV_NAME = RELOCATE
+ENV_NAME = ANT
 
 PARENT_FOLDER = f'checkpoints/{ENV_NAME}'        
 CASE_FOLDER = 'Baseline'
@@ -79,7 +79,7 @@ config = {
     # Online hyperparams  
     'batch_size': 256,
     'learning_rate': 3e-4,
-    'discount': 0.97,
+    'discount': 0.99,
     'delta_skill': 4,
     'gradient_steps': 4,
     'singular_val_k': 1,

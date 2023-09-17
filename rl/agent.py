@@ -134,7 +134,6 @@ class VaLS(hyper_params):
                 self.experience_buffer.update_tracking_buffers(self.reward_per_episode)
             wandb.log({'Reward per episode': self.reward_per_episode,
                        'Total episodes': self.total_episode_counter})
-
             self.reward_logger.append(self.reward_per_episode)
             self.reward_per_episode = 0
             self.total_episode_counter += 1
@@ -181,6 +180,7 @@ class VaLS(hyper_params):
         dones = torch.from_numpy(batch.dones).to(self.device)
         cum_reward = torch.from_numpy(batch.cum_reward).to(self.device)
         norm_cum_reward = torch.from_numpy(batch.norm_cum_reward).to(self.device)
+
         
         if log_data:
             singular_vals = self.compute_singular_vals(params)
@@ -259,7 +259,7 @@ class VaLS(hyper_params):
             wandb.log({'Critic/Distance critic to target 1': dist1,
                        'Critic/Bellman terms': bellman_terms})
 
-        q_target = rew + (0.97 * q_target).reshape(-1, 1) * (1 - dones)
+        q_target = rew + (self.discount * q_target).reshape(-1, 1) * (1 - dones)
         q_target = torch.clamp(q_target, min=-100, max=100)
 
         critic1_loss = F.mse_loss(q1.squeeze(), q_target.squeeze(),
@@ -269,7 +269,7 @@ class VaLS(hyper_params):
 
         if self.SVD:
             with torch.no_grad():
-                weights = F.sigmoid(norm_cum_reward).squeeze()
+                weights = F.sigmoid(2 * norm_cum_reward).squeeze()
         else:
             weights = torch.ones_like(critic1_loss)
             

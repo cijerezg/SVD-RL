@@ -4,13 +4,13 @@ import sys
 sys.path.insert(0, '../')
 
 from utilities.utils import hyper_params, AttrDict, compute_cum_rewards
-import gymnasium as gym
+import gym
+import d4rl
 import numpy as np
 from torch.func import functional_call
 import torch
 import torch.nn.functional as F
-import wandb
-from scipy import signal
+
 
 import pdb
 
@@ -23,11 +23,7 @@ class Sampler(hyper_params):
         super().__init__(args)
 
         self.skill_policy = skill_policy
-        if 'Franka' in self.env_id:
-            self.env = gym.make(self.env_id,
-                                remove_task_when_completed=False)
-        else:
-            self.env = gym.make(self.env_id)
+        self.env = gym.make(self.env_id)
 
 
     def skill_step(self, params, obs):
@@ -40,17 +36,18 @@ class Sampler(hyper_params):
 
             action = action.cpu().numpy()
 
-        obs, reward, terminated, truncated, info = self.env.step(action)
+        # D4RL envs
+        obs, reward, done, info = self.env.step(action)
 
-        if isinstance(obs, dict):
-            obs = self.convert_obs_dict_to_array(obs)
+        # This is for gymnasium
+        #obs, reward, terminated, truncated, info = self.env.step(action)
 
-        done = True if terminated or truncated else False
+        # if isinstance(obs, dict):
+        #     obs = self.convert_obs_dict_to_array(obs)
 
-        if 'Fetch' in self.env_key:
-            done = True if info['is_success'] > 0.0 else done
+        # done = True if terminated or truncated else False
 
-        elif 'Adroit' in self.env_key:
+        if 'relocate' in self.env_key or 'pen':
             done = True if info['success'] else done
 
         next_obs = obs
@@ -66,9 +63,13 @@ class Sampler(hyper_params):
 
     def skill_iteration(self, params, done=False, obs=None):
         if done or obs is None:
-            obs, _ = self.env.reset()
-            if isinstance(obs, dict):
-                obs = self.convert_obs_dict_to_array(obs)           
+            # D4RL envs
+            obs = self.env.reset()
+
+            # Gymnasium envs
+            # obs, _ = self.env.reset()
+            # if isinstance(obs, dict):
+            #     obs = self.convert_obs_dict_to_array(obs)           
 
         return obs, self.skill_step(params, obs)
 
@@ -131,3 +132,11 @@ class ReplayBuffer(hyper_params):
         mean = self.cum_reward[0:self.ptr, :].mean()
         std = self.cum_reward[0:self.ptr, :].std()
         self.norm_cum_reward[0:self.ptr, :] = (self.cum_reward[0:self.ptr, :] - mean) / (std + 1e-4)
+
+    def log_offline_data(self):
+        env = gym.make(self.env_id)
+
+        dataset = d4rl.qlearning_dataset(env)
+
+        pdb.set_trace()
+        print('wait')
