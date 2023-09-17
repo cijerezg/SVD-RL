@@ -57,7 +57,7 @@ elif 'Pen' in ENV_NAME:
     hyperparams_dict  = {'max_iterations': int(4e5) + 1,
                          'buffer_size': int(4e5) + 1,
                          'reset_frequency': 25000,
-                         'test_freq': 100000}
+                         'test_freq': 50000}
 
     
 elif 'Franka' in ENV_NAME:
